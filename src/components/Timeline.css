@@ -1,0 +1,657 @@
+/* ========================================
+
+10分刻みタイムライン専用CSS
+
+1時間 = 120px
+10分 = 20px
+
+======================================== */
+
+
+/* ========================================
+
+10分ごとの横線
+
+======================================== */
+
+.timeline-body-ten-minute
+.time-row-ten-minute {
+  height: 120px;
+
+  background-image:
+    linear-gradient(
+      to bottom,
+
+      transparent 19px,
+      #f1f3f5 20px,
+      transparent 21px,
+
+      transparent 39px,
+      #f1f3f5 40px,
+      transparent 41px,
+
+      transparent 59px,
+      #e8ebef 60px,
+      transparent 61px,
+
+      transparent 79px,
+      #f1f3f5 80px,
+      transparent 81px,
+
+      transparent 99px,
+      #f1f3f5 100px,
+      transparent 101px
+    );
+}
+
+
+/* ========================================
+
+通常タスク
+
+======================================== */
+
+.timeline-body-ten-minute
+.schedule-task {
+  box-sizing: border-box;
+
+  cursor: grab;
+
+  user-select: none;
+
+  touch-action: none;
+}
+
+
+.timeline-body-ten-minute
+.schedule-task:active {
+  cursor: grabbing;
+}
+
+
+.timeline-body-ten-minute
+.schedule-task.dragging {
+  z-index: 30;
+
+  opacity: 0.78;
+
+  cursor: grabbing;
+
+  box-shadow:
+    0 8px 20px
+    rgba(
+      0,
+      0,
+      0,
+      0.18
+    );
+
+  transition: none;
+}
+
+
+/* ========================================
+
+タイムライン内ドラッグ中の
+移動先時刻
+
+======================================== */
+
+.task-drag-time {
+  position: absolute;
+
+  left: -58px;
+
+  top: 50%;
+
+  transform:
+    translateY(-50%);
+
+  min-width: 44px;
+
+  padding:
+    3px
+    5px;
+
+  border-radius: 5px;
+
+  background: #2f5fd0;
+
+  color: #ffffff;
+
+  font-size: 10px;
+
+  font-weight: 700;
+
+  text-align: center;
+
+  pointer-events: none;
+
+  box-shadow:
+    0 3px 8px
+    rgba(
+      0,
+      0,
+      0,
+      0.14
+    );
+}
+
+
+/* ========================================
+
+チェックボックスは
+ドラッグ対象にしない
+
+======================================== */
+
+.timeline-body-ten-minute
+.schedule-checkbox {
+  cursor: pointer;
+
+  touch-action: auto;
+}
+
+
+/* ========================================
+
+10分タスク
+
+======================================== */
+
+.timeline-body-ten-minute
+.schedule-task.compact {
+  min-height: 20px;
+
+  padding: 0 8px;
+}
+
+
+.timeline-body-ten-minute
+.schedule-task.compact
+.schedule-task-compact {
+  display: flex;
+
+  align-items: center;
+
+  gap: 5px;
+
+  height: 100%;
+}
+
+
+.timeline-body-ten-minute
+.schedule-task.compact
+.compact-title {
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+
+  font-size: 11px;
+
+  font-weight: 600;
+}
+
+
+.timeline-body-ten-minute
+.schedule-task.compact
+.compact-time {
+  margin-left: auto;
+
+  flex-shrink: 0;
+
+  font-size: 9px;
+}
+
+
+/* ========================================
+
+右側ToDo
+
+ドラッグ可能な通常タスク
+
+======================================== */
+
+.todo-item-draggable {
+  cursor: grab;
+
+  user-select: none;
+
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+
+.todo-item-draggable:active {
+  cursor: grabbing;
+}
+
+
+.todo-item-draggable.dragging {
+  opacity: 0.45;
+}
+
+
+/* ========================================
+
+右ToDoをタイムラインへ
+ドラッグしている状態
+
+======================================== */
+
+.timeline-body-ten-minute.todo-drop-active {
+  background-color:
+    rgba(
+      47,
+      95,
+      208,
+      0.018
+    );
+}
+
+
+/* ========================================
+
+右ToDoから配置するときの
+予定位置プレビュー
+
+======================================== */
+
+.todo-drop-preview {
+  position: absolute;
+
+  left: 82px;
+
+  right: 12px;
+
+  box-sizing: border-box;
+
+  min-height: 20px;
+
+  padding: 5px 10px;
+
+  border:
+    2px dashed
+    rgba(
+      47,
+      95,
+      208,
+      0.65
+    );
+
+  border-radius: 6px;
+
+  background:
+    rgba(
+      47,
+      95,
+      208,
+      0.11
+    );
+
+  color: #244a9d;
+
+  pointer-events: none;
+
+  z-index: 40;
+
+  overflow: hidden;
+}
+
+
+.todo-drop-preview-title {
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+
+  font-size: 12px;
+
+  font-weight: 700;
+}
+
+
+.todo-drop-preview-time {
+  margin-top: 2px;
+
+  font-size: 10px;
+
+  font-weight: 600;
+
+  opacity: 0.8;
+}
+
+
+/* ========================================
+
+ルーティン表示
+
+通常タスクより
+軽い表示にする
+
+======================================== */
+
+.timeline-body-ten-minute
+.routine-schedule-block-clean {
+  left: 82px;
+
+  right: 12px;
+
+  position: absolute;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 8px;
+
+  box-sizing: border-box;
+
+  min-height: 20px;
+
+  padding: 2px 8px;
+
+  border:
+    1px solid
+    #e1e5ee;
+
+  border-left:
+    3px solid
+    #9aa9d8;
+
+  border-radius: 4px;
+
+  background:
+    rgba(
+      250,
+      251,
+      255,
+      0.96
+    );
+
+  color: #3f4858;
+
+  overflow: hidden;
+
+  cursor: pointer;
+
+  z-index: 4;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.2s ease;
+}
+
+
+.timeline-body-ten-minute
+.routine-schedule-block-clean:hover {
+  background: #f5f7fc;
+
+  border-color: #cfd6e5;
+}
+
+
+.timeline-body-ten-minute
+.routine-schedule-block-clean.selected {
+  overflow: visible;
+
+  z-index: 12;
+
+  background: #f7f9ff;
+
+  border-color: #b8c3df;
+}
+
+
+/* ========================================
+
+ルーティン本体
+
+======================================== */
+
+.routine-schedule-main-clean {
+  display: flex;
+
+  align-items: center;
+
+  gap: 6px;
+
+  min-width: 0;
+
+  cursor: pointer;
+}
+
+
+.routine-schedule-main-clean input {
+  width: 13px;
+
+  height: 13px;
+
+  margin: 0;
+
+  flex-shrink: 0;
+}
+
+
+.routine-schedule-title-clean {
+  min-width: 0;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+
+  font-size: 11px;
+
+  font-weight: 600;
+
+  color: #394151;
+}
+
+
+.routine-schedule-time-clean {
+  flex-shrink: 0;
+
+  font-size: 9px;
+
+  color: #7b8493;
+
+  white-space: nowrap;
+}
+
+
+/* ========================================
+
+10分ルーティン
+
+======================================== */
+
+.routine-schedule-block-clean.compact {
+  padding-top: 0;
+
+  padding-bottom: 0;
+}
+
+
+.routine-schedule-block-clean.compact
+.routine-schedule-title-clean {
+  font-size: 10px;
+}
+
+
+/* ========================================
+
+完了済み
+
+======================================== */
+
+.routine-schedule-block-clean.completed {
+  opacity: 0.5;
+}
+
+
+.routine-schedule-block-clean.completed
+.routine-schedule-title-clean {
+  text-decoration: line-through;
+}
+
+
+/* ========================================
+
+今日はやらない
+
+======================================== */
+
+.routine-schedule-block-clean.skipped {
+  opacity: 0.35;
+
+  filter:
+    grayscale(0.4);
+}
+
+
+/* ========================================
+
+ルーティンクリック時の操作
+
+「今日はやらない」は
+常時表示しない
+
+======================================== */
+
+.routine-schedule-actions {
+  position: absolute;
+
+  top:
+    calc(100% + 4px);
+
+  right: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  padding: 6px 8px;
+
+  border:
+    1px solid
+    #d9dee8;
+
+  border-radius: 6px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 6px 16px
+    rgba(
+      0,
+      0,
+      0,
+      0.08
+    );
+
+  color: #6a7280;
+
+  font-size: 10px;
+
+  white-space: nowrap;
+}
+
+
+.routine-schedule-skip-clean {
+  padding: 4px 7px;
+
+  border:
+    1px solid
+    #d8dde8;
+
+  border-radius: 5px;
+
+  background: #ffffff;
+
+  color: #5f6877;
+
+  cursor: pointer;
+
+  font-size: 10px;
+}
+
+
+.routine-schedule-skip-clean:hover {
+  background: #f4f6f9;
+}
+
+
+/* ========================================
+
+スマートフォン
+
+======================================== */
+
+@media (
+  max-width: 600px
+) {
+
+  .timeline-body-ten-minute
+  .routine-schedule-block-clean {
+    left: 66px;
+
+    right: 6px;
+  }
+
+
+  .todo-drop-preview {
+    left: 66px;
+
+    right: 6px;
+  }
+
+
+  .routine-schedule-time-clean {
+    display: none;
+  }
+
+
+  .routine-schedule-actions {
+    right: 0;
+  }
+}
+/* ========================================
+
+ルーティンドラッグ中
+
+======================================== */
+
+.timeline-body-ten-minute
+.routine-schedule-block-clean.dragging {
+  z-index: 35;
+  opacity: 0.78;
+  cursor: grabbing;
+  box-shadow:
+    0 8px 20px
+    rgba(0, 0, 0, 0.14);
+  transition: none;
+}
+
+
+/* ========================================
+
+タイムラインから右ToDoへ
+戻せることを示す
+
+======================================== */
+
+.todo-panel[data-todo-drop-zone="true"] {
+  position: relative;
+}
