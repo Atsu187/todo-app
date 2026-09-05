@@ -4350,6 +4350,75 @@ ToDoリスト
 
 /* ========================================
 
+ルーティンのタイトル・開始時間を左側にまとめる
+
+======================================== */
+
+.routine-schedule-block-clean .routine-schedule-main-clean {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.routine-schedule-block-clean .routine-schedule-time-clean {
+  flex: 0 0 auto;
+  margin-left: 6px !important;
+  margin-right: 0 !important;
+  white-space: nowrap;
+}
+
+
+/* ========================================
+
+10分など小さいタスクのタイトル・時間を左側にまとめる
+
+======================================== */
+
+.schedule-task.compact .schedule-task-compact {
+  justify-content: flex-start;
+}
+
+.schedule-task.compact .compact-title {
+  flex: 0 1 auto;
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-task.compact .compact-time {
+  flex: 0 0 auto;
+  margin-left: 6px !important;
+  margin-right: 0 !important;
+  white-space: nowrap;
+}
+
+
+/* ========================================
+
+ルーティンのタイトル・開始時間を左側にまとめる
+
+======================================== */
+
+.routine-schedule-block-clean {
+  justify-content: flex-start !important;
+}
+
+.routine-schedule-block-clean .routine-schedule-main-clean {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.routine-schedule-block-clean .routine-schedule-time-clean {
+  flex: 0 0 auto;
+  margin-left: 6px !important;
+  margin-right: 0 !important;
+  white-space: nowrap;
+}
+
+
+/* ========================================
+
 スマートフォン
 ページ全体をスクロール
 
