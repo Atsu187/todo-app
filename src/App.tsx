@@ -21,11 +21,13 @@
 
 import {
   useEffect,
+  useRef,
   useState,
 } from 'react'
 
 import './App.css'
 
+import LoginPage from './components/LoginPage'
 import Sidebar from './components/Sidebar'
 import TaskModal from './components/TaskModal'
 import TomorrowRoutineModal from './components/TomorrowRoutineModal'
@@ -37,9 +39,55 @@ import RoutinePage from './pages/RoutinePage'
 import GoogleCalendarPage from './pages/GoogleCalendarPage'
 import SettingsPage from './pages/SettingsPage'
 
+import {
+  supabase,
+} from './services/supabase'
+
+import {
+  createTask,
+  deleteTaskFromSupabase,
+  fetchTasks,
+  updateTask,
+} from './services/taskService'
+
+import {
+  deleteRoutineFromSupabase,
+  fetchRoutines,
+  saveRoutine,
+} from './services/routineService'
+
+import {
+  deleteRoutineOverrideFromSupabase,
+  fetchRoutineOverrides,
+  saveRoutineOverride,
+} from './services/routineOverrideService'
+
+import {
+  deleteRoutineStateFromSupabase,
+  fetchRoutineStates,
+  saveRoutineState,
+} from './services/routineStateService'
+
+import {
+  deleteTaskDayResultFromSupabase,
+  fetchTaskDayResults,
+  saveTaskDayResult,
+} from './services/taskDayResultService'
+
+import {
+  deleteLifeLogFromSupabase,
+  fetchLifeLogs,
+  saveLifeLog,
+} from './services/lifeLogService'
+
+import type {
+  Session,
+} from '@supabase/supabase-js'
+
 import type {
   Priority,
   Task,
+  TaskId,
   TaskDayResult,
 } from './types/task'
 
@@ -126,7 +174,25 @@ function useStoredState<T>(
 }
 
 
-function App() {
+
+
+/* ========================================
+
+Supabase初回移行の重複実行防止
+
+React開発環境ではuseEffectが
+確認のため複数回実行されることがあるため、
+同じページ読み込み中の二重移行を防ぐ
+
+======================================== */
+
+const TASK_MIGRATION_KEY =
+  'todo-app-tasks-supabase-migrated-v1'
+
+let taskMigrationStarted = false
+
+
+function TodoApp() {
   /* ========================================
 
   現在表示ページ
@@ -180,6 +246,22 @@ function App() {
 
   /* ========================================
 
+  Supabaseタスク同期状態
+
+  初回読込が完了するまでは
+  自動同期を開始しない
+
+  ======================================== */
+
+  const [taskSyncReady, setTaskSyncReady] =
+    useState(false)
+
+  const taskSyncQueue =
+    useRef(Promise.resolve())
+
+
+  /* ========================================
+
   タスクの日別結果
 
   ======================================== */
@@ -189,6 +271,424 @@ function App() {
       'todo-app-task-day-results-v1',
       []
     )
+
+
+  /* ========================================
+
+  localStorage → Supabase
+  初回タスク移行
+
+  React開発環境の二重実行を防止し、
+  既にSupabaseにデータがある場合は
+  再登録せずSupabase側を正とする
+
+  ======================================== */
+
+  useEffect(() => {
+    if (taskMigrationStarted) {
+      /*
+      React Strict Modeの確認用再実行でも
+      通常同期だけは開始できるようにする
+      */
+      setTaskSyncReady(true)
+      return
+    }
+
+    taskMigrationStarted = true
+
+    const migrateTasks = async () => {
+      try {
+        const remoteTasks =
+          await fetchTasks()
+
+        const localOnlyTasks =
+          tasks.filter(
+            (task) =>
+              typeof task.id ===
+              'number'
+          )
+
+        const migrationCompleted =
+          localStorage.getItem(
+            TASK_MIGRATION_KEY
+          ) === 'true'
+
+        /* ========================================
+
+        既にSupabase側にタスクがある場合
+
+        初回移行済みと判断し、
+        二重INSERTを行わない
+
+        ======================================== */
+
+        if (remoteTasks.length > 0) {
+          setTasks(remoteTasks)
+          setTaskSyncReady(true)
+
+          localStorage.setItem(
+            TASK_MIGRATION_KEY,
+            'true'
+          )
+
+          return
+        }
+
+        /* ========================================
+
+        既に移行済みで、
+        Supabase側が空の場合
+
+        自動で再登録せず処理を止める
+
+        ======================================== */
+
+        if (migrationCompleted) {
+          setTasks([])
+          setTaskSyncReady(true)
+          return
+        }
+
+        if (localOnlyTasks.length === 0) {
+          setTasks([])
+          setTaskSyncReady(true)
+
+          localStorage.setItem(
+            TASK_MIGRATION_KEY,
+            'true'
+          )
+
+          return
+        }
+
+        const idMap =
+          new Map<TaskId, TaskId>()
+
+        const migratedTasks: Task[] = []
+
+        for (const task of localOnlyTasks) {
+          const savedTask =
+            await createTask(task)
+
+          idMap.set(
+            task.id,
+            savedTask.id
+          )
+
+          migratedTasks.push(
+            savedTask
+          )
+        }
+
+        setTasks(migratedTasks)
+        setTaskSyncReady(true)
+
+        setTaskDayResults(
+          (current) =>
+            current.map(
+              (result) => ({
+                ...result,
+                taskId:
+                  idMap.get(
+                    result.taskId
+                  ) ??
+                  result.taskId,
+              })
+            )
+        )
+
+        localStorage.setItem(
+          TASK_MIGRATION_KEY,
+          'true'
+        )
+      } catch (error) {
+        taskMigrationStarted = false
+        setTaskSyncReady(false)
+
+        console.error(
+          'タスクのSupabase移行に失敗しました',
+          error
+        )
+      }
+    }
+
+    void migrateTasks()
+  }, [])
+
+
+  /* ========================================
+
+  通常タスクをSupabaseへ同期
+
+  ・新規タスクはUUIDを発行して置換
+  ・編集、完了、日時変更も更新
+  ・処理は順番に実行して競合を防ぐ
+
+  ======================================== */
+
+  useEffect(() => {
+    if (!taskSyncReady) {
+      return
+    }
+
+    const snapshot = tasks
+
+    taskSyncQueue.current =
+      taskSyncQueue.current
+        .then(async () => {
+          const idMap =
+            new Map<TaskId, TaskId>()
+
+          for (const task of snapshot) {
+            if (typeof task.id === 'number') {
+              const savedTask =
+                await createTask(task)
+
+              idMap.set(
+                task.id,
+                savedTask.id
+              )
+            } else {
+              await updateTask(task)
+            }
+          }
+
+          if (idMap.size === 0) {
+            return
+          }
+
+          setTasks(
+            (current) =>
+              current.map(
+                (task) => {
+                  const nextId =
+                    idMap.get(task.id)
+
+                  return nextId
+                    ? {
+                        ...task,
+                        id: nextId,
+                      }
+                    : task
+                }
+              )
+          )
+
+          setTaskDayResults(
+            (current) =>
+              current.map(
+                (result) => ({
+                  ...result,
+                  taskId:
+                    idMap.get(
+                      result.taskId
+                    ) ??
+                    result.taskId,
+                })
+              )
+          )
+        })
+        .catch((error) => {
+          console.error(
+            'タスクのSupabase同期に失敗しました',
+            error
+          )
+        })
+  }, [
+    tasks,
+    taskSyncReady,
+    setTaskDayResults,
+    setTasks,
+  ])
+
+
+  /* ========================================
+
+  Supabase タスク日別結果同期
+
+  過去日の「できた / できなかった」を
+  Supabaseへ保存する
+
+  ======================================== */
+
+  const [taskDayResultSyncReady, setTaskDayResultSyncReady] =
+    useState(false)
+
+  const taskDayResultSyncQueue =
+    useRef(Promise.resolve())
+
+  const taskDayResultMigrationStarted =
+    useRef(false)
+
+  const taskDayResultKnownKeys =
+    useRef<Set<string>>(new Set())
+
+  const getTaskDayResultKey = (
+    result: TaskDayResult
+  ) =>
+    `${result.taskId}:${result.date}`
+
+  useEffect(() => {
+    if (!taskSyncReady) {
+      return
+    }
+
+    if (taskDayResultMigrationStarted.current) {
+      return
+    }
+
+    taskDayResultMigrationStarted.current = true
+
+    const TASK_DAY_RESULT_MIGRATION_KEY =
+      'todo-app-task-day-results-supabase-migrated-v1'
+
+    const migrateTaskDayResults = async () => {
+      try {
+        const remoteResults =
+          await fetchTaskDayResults()
+
+        if (remoteResults.length > 0) {
+          taskDayResultKnownKeys.current =
+            new Set(
+              remoteResults.map(
+                getTaskDayResultKey
+              )
+            )
+
+          setTaskDayResults(remoteResults)
+          setTaskDayResultSyncReady(true)
+
+          localStorage.setItem(
+            TASK_DAY_RESULT_MIGRATION_KEY,
+            'true'
+          )
+
+          return
+        }
+
+        const localResults =
+          taskDayResults.filter(
+            (result) =>
+              typeof result.taskId === 'string'
+          )
+
+        const migratedResults:
+          TaskDayResult[] = []
+
+        for (const result of localResults) {
+          const savedResult =
+            await saveTaskDayResult(result)
+
+          migratedResults.push(
+            savedResult
+          )
+        }
+
+        taskDayResultKnownKeys.current =
+          new Set(
+            migratedResults.map(
+              getTaskDayResultKey
+            )
+          )
+
+        if (
+          migratedResults.length > 0 ||
+          taskDayResults.length > 0
+        ) {
+          setTaskDayResults(migratedResults)
+        }
+
+        setTaskDayResultSyncReady(true)
+
+        localStorage.setItem(
+          TASK_DAY_RESULT_MIGRATION_KEY,
+          'true'
+        )
+      } catch (error) {
+        taskDayResultMigrationStarted.current = false
+        setTaskDayResultSyncReady(false)
+
+        console.error(
+          'タスク日別結果のSupabase移行に失敗しました',
+          error
+        )
+      }
+    }
+
+    void migrateTaskDayResults()
+  }, [taskSyncReady])
+
+
+  /* ========================================
+
+  タスク日別結果をSupabaseへ同期
+
+  追加 / 更新を保存し、
+  アプリ側から消えた結果は削除する
+
+  ======================================== */
+
+  useEffect(() => {
+    if (!taskDayResultSyncReady) {
+      return
+    }
+
+    const activeResults =
+      taskDayResults.filter(
+        (result) =>
+          typeof result.taskId === 'string'
+      )
+
+    const previousKeys =
+      new Set(
+        taskDayResultKnownKeys.current
+      )
+
+    const nextKeys =
+      new Set(
+        activeResults.map(
+          getTaskDayResultKey
+        )
+      )
+
+    taskDayResultSyncQueue.current =
+      taskDayResultSyncQueue.current
+        .then(async () => {
+          for (const result of activeResults) {
+            await saveTaskDayResult(result)
+          }
+
+          for (const key of previousKeys) {
+            if (!nextKeys.has(key)) {
+              const separatorIndex =
+                key.lastIndexOf(':')
+
+              const taskId =
+                key.slice(0, separatorIndex)
+
+              const date =
+                key.slice(separatorIndex + 1)
+
+              await deleteTaskDayResultFromSupabase(
+                taskId,
+                date
+              )
+            }
+          }
+
+          taskDayResultKnownKeys.current =
+            nextKeys
+        })
+        .catch((error) => {
+          console.error(
+            'タスク日別結果のSupabase同期に失敗しました',
+            error
+          )
+        })
+  }, [
+    taskDayResults,
+    taskDayResultSyncReady,
+  ])
 
 
   /* ========================================
@@ -206,6 +706,219 @@ function App() {
 
   /* ========================================
 
+  Supabaseルーティン同期状態
+
+  初回読込が完了するまでは
+  自動同期を開始しない
+
+  ======================================== */
+
+  const [routineSyncReady, setRoutineSyncReady] =
+    useState(false)
+
+  const routineSyncQueue =
+    useRef(Promise.resolve())
+
+  const routineMigrationStarted =
+    useRef(false)
+
+  const routineKnownIds =
+    useRef<Set<number>>(
+      new Set()
+    )
+
+
+  /* ========================================
+
+  localStorage → Supabase
+  初回ルーティン移行
+
+  Supabase側に既存データがある場合は
+  そちらを正として読み込む
+
+  ======================================== */
+
+  useEffect(() => {
+    if (routineMigrationStarted.current) {
+      return
+    }
+
+    routineMigrationStarted.current = true
+
+    const ROUTINE_MIGRATION_KEY =
+      'todo-app-routines-supabase-migrated-v1'
+
+    const migrateRoutines = async () => {
+      try {
+        const remoteRoutines =
+          await fetchRoutines()
+
+        /* ========================================
+
+        既にSupabase側にある場合
+
+        Supabase側を正として読み込む
+
+        ======================================== */
+
+        if (remoteRoutines.length > 0) {
+          routineKnownIds.current =
+            new Set(
+              remoteRoutines.map(
+                (routine) =>
+                  routine.id
+              )
+            )
+
+          setRoutines(remoteRoutines)
+          setRoutineSyncReady(true)
+
+          localStorage.setItem(
+            ROUTINE_MIGRATION_KEY,
+            'true'
+          )
+
+          return
+        }
+
+        /* ========================================
+
+        Supabase側が空の場合
+
+        localStorageにルーティンが残っていれば
+        移行済みフラグの有無に関係なく再登録する
+
+        テーブルを作り直した場合でも
+        ローカルデータを失わないための処理
+
+        ======================================== */
+
+        if (routines.length === 0) {
+          routineKnownIds.current =
+            new Set()
+
+          setRoutineSyncReady(true)
+
+          localStorage.setItem(
+            ROUTINE_MIGRATION_KEY,
+            'true'
+          )
+
+          return
+        }
+
+        /* ========================================
+
+        初回移行
+
+        現在のlocalStorageのルーティンを
+        同じ数値idのままSupabaseへ保存する
+
+        ======================================== */
+
+        const migratedRoutines:
+          RoutineItem[] = []
+
+        for (const routine of routines) {
+          const savedRoutine =
+            await saveRoutine(routine)
+
+          migratedRoutines.push(
+            savedRoutine
+          )
+        }
+
+        routineKnownIds.current =
+          new Set(
+            migratedRoutines.map(
+              (routine) =>
+                routine.id
+            )
+          )
+
+        setRoutines(migratedRoutines)
+        setRoutineSyncReady(true)
+
+        localStorage.setItem(
+          ROUTINE_MIGRATION_KEY,
+          'true'
+        )
+      } catch (error) {
+        routineMigrationStarted.current = false
+        setRoutineSyncReady(false)
+
+        console.error(
+          'ルーティンのSupabase移行に失敗しました',
+          error
+        )
+      }
+    }
+
+    void migrateRoutines()
+  }, [])
+
+
+  /* ========================================
+
+  ルーティンをSupabaseへ同期
+
+  ・追加 / 編集 / 並び替えを保存
+  ・削除されたidはSupabaseから削除
+  ・処理は順番に実行して競合を防ぐ
+
+  ======================================== */
+
+  useEffect(() => {
+    if (!routineSyncReady) {
+      return
+    }
+
+    const snapshot = routines
+
+    const previousIds =
+      new Set(
+        routineKnownIds.current
+      )
+
+    const nextIds =
+      new Set(
+        snapshot.map(
+          (routine) => routine.id
+        )
+      )
+
+    routineSyncQueue.current =
+      routineSyncQueue.current
+        .then(async () => {
+          for (const routine of snapshot) {
+            await saveRoutine(routine)
+          }
+
+          for (const routineId of previousIds) {
+            if (!nextIds.has(routineId)) {
+              await deleteRoutineFromSupabase(
+                routineId
+              )
+            }
+          }
+
+          routineKnownIds.current =
+            nextIds
+        })
+        .catch((error) => {
+          console.error(
+            'ルーティンのSupabase同期に失敗しました',
+            error
+          )
+        })
+  }, [
+    routines,
+    routineSyncReady,
+  ])
+
+
+  /* ========================================
+
   日別ルーティン時刻変更
 
   ======================================== */
@@ -215,6 +928,189 @@ function App() {
       'todo-app-routine-overrides-v1',
       []
     )
+
+
+  /* ========================================
+
+  Supabase 日別ルーティン時刻同期
+
+  Supabase側に既存データがある場合は
+  そちらを正として読み込む
+
+  ======================================== */
+
+  const [routineOverrideSyncReady, setRoutineOverrideSyncReady] =
+    useState(false)
+
+  const routineOverrideSyncQueue =
+    useRef(Promise.resolve())
+
+  const routineOverrideMigrationStarted =
+    useRef(false)
+
+  const routineOverrideKnownKeys =
+    useRef<Set<string>>(new Set())
+
+  const getRoutineOverrideKey = (
+    override: RoutineTimeOverride
+  ) =>
+    `${override.routineId}:${override.date}`
+
+  useEffect(() => {
+    if (routineOverrideMigrationStarted.current) {
+      return
+    }
+
+    routineOverrideMigrationStarted.current = true
+
+    const ROUTINE_OVERRIDE_MIGRATION_KEY =
+      'todo-app-routine-overrides-supabase-migrated-v1'
+
+    const migrateRoutineOverrides = async () => {
+      try {
+        const remoteOverrides =
+          await fetchRoutineOverrides()
+
+        if (remoteOverrides.length > 0) {
+          routineOverrideKnownKeys.current =
+            new Set(
+              remoteOverrides.map(
+                getRoutineOverrideKey
+              )
+            )
+
+          setRoutineOverrides(remoteOverrides)
+          setRoutineOverrideSyncReady(true)
+
+          localStorage.setItem(
+            ROUTINE_OVERRIDE_MIGRATION_KEY,
+            'true'
+          )
+
+          return
+        }
+
+        if (routineOverrides.length === 0) {
+          routineOverrideKnownKeys.current =
+            new Set()
+
+          setRoutineOverrideSyncReady(true)
+
+          localStorage.setItem(
+            ROUTINE_OVERRIDE_MIGRATION_KEY,
+            'true'
+          )
+
+          return
+        }
+
+        const migratedOverrides:
+          RoutineTimeOverride[] = []
+
+        for (const override of routineOverrides) {
+          const savedOverride =
+            await saveRoutineOverride(override)
+
+          migratedOverrides.push(
+            savedOverride
+          )
+        }
+
+        routineOverrideKnownKeys.current =
+          new Set(
+            migratedOverrides.map(
+              getRoutineOverrideKey
+            )
+          )
+
+        setRoutineOverrides(
+          migratedOverrides
+        )
+        setRoutineOverrideSyncReady(true)
+
+        localStorage.setItem(
+          ROUTINE_OVERRIDE_MIGRATION_KEY,
+          'true'
+        )
+      } catch (error) {
+        routineOverrideMigrationStarted.current = false
+        setRoutineOverrideSyncReady(false)
+
+        console.error(
+          '日別ルーティン時刻のSupabase移行に失敗しました',
+          error
+        )
+      }
+    }
+
+    void migrateRoutineOverrides()
+  }, [])
+
+
+  /* ========================================
+
+  日別ルーティン時刻をSupabaseへ同期
+
+  ======================================== */
+
+  useEffect(() => {
+    if (!routineOverrideSyncReady) {
+      return
+    }
+
+    const snapshot = routineOverrides
+
+    const previousKeys =
+      new Set(
+        routineOverrideKnownKeys.current
+      )
+
+    const nextKeys =
+      new Set(
+        snapshot.map(
+          getRoutineOverrideKey
+        )
+      )
+
+    routineOverrideSyncQueue.current =
+      routineOverrideSyncQueue.current
+        .then(async () => {
+          for (const override of snapshot) {
+            await saveRoutineOverride(override)
+          }
+
+          for (const key of previousKeys) {
+            if (!nextKeys.has(key)) {
+              const separatorIndex =
+                key.indexOf(':')
+
+              const routineId = Number(
+                key.slice(0, separatorIndex)
+              )
+
+              const date =
+                key.slice(separatorIndex + 1)
+
+              await deleteRoutineOverrideFromSupabase(
+                routineId,
+                date
+              )
+            }
+          }
+
+          routineOverrideKnownKeys.current =
+            nextKeys
+        })
+        .catch((error) => {
+          console.error(
+            '日別ルーティン時刻のSupabase同期に失敗しました',
+            error
+          )
+        })
+  }, [
+    routineOverrides,
+    routineOverrideSyncReady,
+  ])
 
 
   /* ========================================
@@ -232,6 +1128,211 @@ function App() {
 
   /* ========================================
 
+  Supabase 日別ルーティン結果同期
+
+  completed / skipped のどちらでもない状態は
+  Supabaseには保存しない
+
+  ======================================== */
+
+  const [routineStateSyncReady, setRoutineStateSyncReady] =
+    useState(false)
+
+  const routineStateSyncQueue =
+    useRef(Promise.resolve())
+
+  const routineStateMigrationStarted =
+    useRef(false)
+
+  const routineStateKnownKeys =
+    useRef<Set<string>>(new Set())
+
+  const getRoutineStateKey = (
+    state: RoutineDayState
+  ) =>
+    `${state.routineId}:${state.date}`
+
+  const isStoredRoutineState = (
+    state: RoutineDayState
+  ) =>
+    state.completed || state.skipped
+
+  useEffect(() => {
+    if (!routineSyncReady) {
+      return
+    }
+
+    if (routineStateMigrationStarted.current) {
+      return
+    }
+
+    routineStateMigrationStarted.current = true
+
+    const ROUTINE_STATE_MIGRATION_KEY =
+      'todo-app-routine-states-supabase-migrated-v1'
+
+    const migrateRoutineStates = async () => {
+      try {
+        const remoteStates =
+          await fetchRoutineStates()
+
+        if (remoteStates.length > 0) {
+          routineStateKnownKeys.current =
+            new Set(
+              remoteStates.map(
+                getRoutineStateKey
+              )
+            )
+
+          setRoutineStates(remoteStates)
+          setRoutineStateSyncReady(true)
+
+          localStorage.setItem(
+            ROUTINE_STATE_MIGRATION_KEY,
+            'true'
+          )
+
+          return
+        }
+
+        const localStates =
+          routineStates.filter(
+            isStoredRoutineState
+          )
+
+        if (localStates.length === 0) {
+          routineStateKnownKeys.current =
+            new Set()
+
+          if (routineStates.length > 0) {
+            setRoutineStates([])
+          }
+
+          setRoutineStateSyncReady(true)
+
+          localStorage.setItem(
+            ROUTINE_STATE_MIGRATION_KEY,
+            'true'
+          )
+
+          return
+        }
+
+        const migratedStates:
+          RoutineDayState[] = []
+
+        for (const state of localStates) {
+          const savedState =
+            await saveRoutineState(state)
+
+          migratedStates.push(
+            savedState
+          )
+        }
+
+        routineStateKnownKeys.current =
+          new Set(
+            migratedStates.map(
+              getRoutineStateKey
+            )
+          )
+
+        setRoutineStates(migratedStates)
+        setRoutineStateSyncReady(true)
+
+        localStorage.setItem(
+          ROUTINE_STATE_MIGRATION_KEY,
+          'true'
+        )
+      } catch (error) {
+        routineStateMigrationStarted.current = false
+        setRoutineStateSyncReady(false)
+
+        console.error(
+          '日別ルーティン結果のSupabase移行に失敗しました',
+          error
+        )
+      }
+    }
+
+    void migrateRoutineStates()
+  }, [routineSyncReady])
+
+
+  /* ========================================
+
+  日別ルーティン結果をSupabaseへ同期
+
+  完了 / 今日やらないを保存し、
+  解除された状態はSupabaseから削除する
+
+  ======================================== */
+
+  useEffect(() => {
+    if (!routineStateSyncReady) {
+      return
+    }
+
+    const activeStates =
+      routineStates.filter(
+        isStoredRoutineState
+      )
+
+    const previousKeys =
+      new Set(
+        routineStateKnownKeys.current
+      )
+
+    const nextKeys =
+      new Set(
+        activeStates.map(
+          getRoutineStateKey
+        )
+      )
+
+    routineStateSyncQueue.current =
+      routineStateSyncQueue.current
+        .then(async () => {
+          for (const state of activeStates) {
+            await saveRoutineState(state)
+          }
+
+          for (const key of previousKeys) {
+            if (!nextKeys.has(key)) {
+              const separatorIndex =
+                key.indexOf(':')
+
+              const routineId = Number(
+                key.slice(0, separatorIndex)
+              )
+
+              const date =
+                key.slice(separatorIndex + 1)
+
+              await deleteRoutineStateFromSupabase(
+                routineId,
+                date
+              )
+            }
+          }
+
+          routineStateKnownKeys.current =
+            nextKeys
+        })
+        .catch((error) => {
+          console.error(
+            '日別ルーティン結果のSupabase同期に失敗しました',
+            error
+          )
+        })
+  }, [
+    routineStates,
+    routineStateSyncReady,
+  ])
+
+
+  /* ========================================
+
   起床時刻・振り返り
 
   ======================================== */
@@ -245,6 +1346,159 @@ function App() {
 
   /* ========================================
 
+  Supabase 生活記録同期
+
+  既存localStorageの生活記録を初回移行し、
+  以後は追加 / 更新 / 削除を同期する
+
+  ======================================== */
+
+  const [lifeLogSyncReady, setLifeLogSyncReady] =
+    useState(false)
+
+  const lifeLogSyncQueue =
+    useRef(Promise.resolve())
+
+  const lifeLogMigrationStarted =
+    useRef(false)
+
+  const lifeLogKnownDates =
+    useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (lifeLogMigrationStarted.current) {
+      return
+    }
+
+    lifeLogMigrationStarted.current = true
+
+    const LIFE_LOG_MIGRATION_KEY =
+      'todo-app-life-logs-supabase-migrated-v1'
+
+    const migrateLifeLogs = async () => {
+      try {
+        const remoteLogs =
+          await fetchLifeLogs()
+
+        if (remoteLogs.length > 0) {
+          lifeLogKnownDates.current =
+            new Set(
+              remoteLogs.map(
+                (log) => log.date
+              )
+            )
+
+          setLifeLogs(remoteLogs)
+          setLifeLogSyncReady(true)
+
+          localStorage.setItem(
+            LIFE_LOG_MIGRATION_KEY,
+            'true'
+          )
+
+          return
+        }
+
+        const migratedLogs:
+          DailyLifeLog[] = []
+
+        for (const log of lifeLogs) {
+          const savedLog =
+            await saveLifeLog(log)
+
+          migratedLogs.push(savedLog)
+        }
+
+        lifeLogKnownDates.current =
+          new Set(
+            migratedLogs.map(
+              (log) => log.date
+            )
+          )
+
+        if (migratedLogs.length > 0) {
+          setLifeLogs(migratedLogs)
+        }
+
+        setLifeLogSyncReady(true)
+
+        localStorage.setItem(
+          LIFE_LOG_MIGRATION_KEY,
+          'true'
+        )
+      } catch (error) {
+        lifeLogMigrationStarted.current = false
+        setLifeLogSyncReady(false)
+
+        console.error(
+          '生活記録のSupabase移行に失敗しました',
+          error
+        )
+      }
+    }
+
+    void migrateLifeLogs()
+  }, [])
+
+
+  /* ========================================
+
+  生活記録をSupabaseへ同期
+
+  ======================================== */
+
+  useEffect(() => {
+    if (!lifeLogSyncReady) {
+      return
+    }
+
+    const snapshot =
+      lifeLogs.map(
+        (log) => ({ ...log })
+      )
+
+    const previousDates =
+      new Set(lifeLogKnownDates.current)
+
+    const nextDates =
+      new Set(
+        snapshot.map(
+          (log) => log.date
+        )
+      )
+
+    lifeLogSyncQueue.current =
+      lifeLogSyncQueue.current
+        .then(async () => {
+          for (const log of snapshot) {
+            await saveLifeLog(log)
+          }
+
+          for (const date of previousDates) {
+            if (!nextDates.has(date)) {
+              await deleteLifeLogFromSupabase(
+                date
+              )
+            }
+          }
+
+          lifeLogKnownDates.current =
+            nextDates
+        })
+        .catch((error) => {
+          console.error(
+            '生活記録のSupabase同期に失敗しました',
+            error
+          )
+        })
+  }, [
+    lifeLogs,
+    lifeLogSyncReady,
+  ])
+
+
+  /* ========================================
+
   タスクモーダル
 
   ======================================== */
@@ -253,7 +1507,7 @@ function App() {
     useState(false)
 
   const [editingTaskId, setEditingTaskId] =
-    useState<number | null>(null)
+    useState<TaskId | null>(null)
 
 
   /* ========================================
@@ -840,14 +2094,36 @@ function App() {
       return
     }
 
+    const deletedTaskId =
+      editingTaskId
+
     setTasks(
       (current) =>
         current.filter(
           (task) =>
             task.id !==
-            editingTaskId
+            deletedTaskId
         )
     )
+
+    if (
+      typeof deletedTaskId ===
+      'string'
+    ) {
+      taskSyncQueue.current =
+        taskSyncQueue.current
+          .then(() =>
+            deleteTaskFromSupabase(
+              deletedTaskId
+            )
+          )
+          .catch((error) => {
+            console.error(
+              'タスクのSupabase削除に失敗しました',
+              error
+            )
+          })
+    }
 
     closeTaskModal()
   }
@@ -866,7 +2142,7 @@ function App() {
 ======================================== */
 
 const moveTaskOnTimeline = (
-  taskId: number,
+  taskId: TaskId,
   startMinutes: number
 ) => {
   setTasks(
@@ -918,7 +2194,7 @@ const moveTaskOnTimeline = (
   ======================================== */
 
   const unscheduleTask = (
-    taskId: number
+    taskId: TaskId
   ) => {
     setTasks(
       (current) =>
@@ -1008,7 +2284,7 @@ const moveTaskOnTimeline = (
   ======================================== */
 
   const toggleTaskComplete = (
-    taskId: number
+    taskId: TaskId
   ) => {
     const target =
       tasks.find(
@@ -1079,7 +2355,7 @@ const moveTaskOnTimeline = (
   ======================================== */
 
   const moveTaskToTomorrow = (
-    taskId: number
+    taskId: TaskId
   ) => {
     setTasks(
       (current) =>
@@ -1520,6 +2796,107 @@ const moveTaskOnTimeline = (
         }
       />
     </div>
+  )
+}
+
+
+/* ========================================
+
+Supabase認証
+
+・ログイン状態を確認
+・ログイン状態を維持
+・ログアウトを管理
+
+======================================== */
+
+function App() {
+  const [session, setSession] =
+    useState<Session | null>(null)
+
+  const [isAuthLoading, setIsAuthLoading] =
+    useState(true)
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadSession = async () => {
+      const {
+        data,
+      } = await supabase.auth.getSession()
+
+      if (!isMounted) {
+        return
+      }
+
+      setSession(
+        data.session
+      )
+
+      setIsAuthLoading(
+        false
+      )
+    }
+
+    void loadSession()
+
+    const {
+      data: authListener,
+    } = supabase.auth.onAuthStateChange(
+      (_event, nextSession) => {
+        setSession(
+          nextSession
+        )
+
+        setIsAuthLoading(
+          false
+        )
+      }
+    )
+
+    return () => {
+      isMounted = false
+
+      authListener.subscription.unsubscribe()
+    }
+  }, [])
+
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+  }
+
+
+  if (isAuthLoading) {
+    return (
+      <div className="auth-loading-page">
+        <div className="auth-loading-card">
+          読み込み中...
+        </div>
+      </div>
+    )
+  }
+
+
+  if (!session) {
+    return <LoginPage />
+  }
+
+
+  return (
+    <>
+      <TodoApp />
+
+      <button
+        type="button"
+        className="app-logout-button"
+        onClick={() => {
+          void handleLogout()
+        }}
+      >
+        ログアウト
+      </button>
+    </>
   )
 }
 

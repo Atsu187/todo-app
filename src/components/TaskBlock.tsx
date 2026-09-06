@@ -20,6 +20,7 @@ import type {
 
 import type {
   Task,
+  TaskId,
 } from '../types/task'
 
 
@@ -41,7 +42,7 @@ type Props = {
   dragTimeText: string | null
 
   onToggleComplete:
-    (taskId: number) => void
+    (taskId: TaskId) => void
 
   onEdit:
     (task: Task) => void

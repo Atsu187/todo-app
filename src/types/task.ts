@@ -9,6 +9,19 @@ export type Priority = '低' | '中' | '高'
 
 /* ========================================
 
+タスクID
+
+既存のlocalStorageではnumber、
+Supabaseではuuid文字列を使用するため
+移行期間は両方を許可する
+
+======================================== */
+
+export type TaskId = number | string
+
+
+/* ========================================
+
 通常タスク
 
 taskDate
@@ -20,7 +33,7 @@ completedDate
 ======================================== */
 
 export type Task = {
-  id: number
+  id: TaskId
 
   title: string
 
@@ -60,7 +73,7 @@ export type Task = {
 export type TaskDayResult = {
   date: string
 
-  taskId: number
+  taskId: TaskId
 
   title: string
 

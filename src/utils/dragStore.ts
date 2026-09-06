@@ -9,10 +9,12 @@ DragOver中にdataTransferの値を
 
 ======================================== */
 
-let activeTodoTaskId: number | null = null
+import type { TaskId } from '../types/task'
+
+let activeTodoTaskId: TaskId | null = null
 
 export const setActiveTodoTaskId = (
-  taskId: number
+  taskId: TaskId
 ) => {
   activeTodoTaskId = taskId
 }

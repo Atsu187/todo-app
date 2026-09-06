@@ -31,6 +31,7 @@ import type {
 
 import type {
   Task,
+  TaskId,
 } from '../types/task'
 
 import type {
@@ -73,19 +74,19 @@ type Props = {
     RoutineDayState[]
 
   onToggleComplete:
-    (taskId: number) => void
+    (taskId: TaskId) => void
 
   onEditTask:
     (task: Task) => void
 
   onMoveTask:
     (
-      taskId: number,
+      taskId: TaskId,
       startMinutes: number
     ) => void
 
   onUnscheduleTask:
-    (taskId: number) => void
+    (taskId: TaskId) => void
 
   onMoveRoutine:
     (
@@ -102,7 +103,7 @@ type Props = {
 
 
 type DragState = {
-  taskId: number
+  taskId: TaskId
 
   pointerStartY: number
 
@@ -132,7 +133,7 @@ type RoutineDragState = {
 
 
 type TodoDropPreview = {
-  taskId: number
+  taskId: TaskId
 
   startMinutes: number
 
@@ -185,7 +186,7 @@ function Timeline({
   ======================================== */
 
   const suppressClickTaskIdRef =
-    useRef<number | null>(
+    useRef<TaskId | null>(
       null
     )
 
@@ -427,7 +428,7 @@ function Timeline({
   ======================================== */
 
   const taskLayout = new Map<
-    number,
+    TaskId,
     { columnIndex: number; columnCount: number }
   >()
 
@@ -448,7 +449,7 @@ function Timeline({
     }
 
     const columnEnds: number[] = []
-    const assignments = new Map<number, number>()
+    const assignments = new Map<TaskId, number>()
 
     overlapGroup.forEach((task) => {
       const start =

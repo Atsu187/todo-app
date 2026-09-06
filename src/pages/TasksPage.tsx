@@ -22,6 +22,7 @@ import {
 import type {
   Priority,
   Task,
+  TaskId,
 } from '../types/task'
 
 import {
@@ -56,7 +57,7 @@ type Props = {
     (task: Task) => void
 
   onToggleComplete:
-    (taskId: number) => void
+    (taskId: TaskId) => void
 
   onOpenDate:
     (date: string) => void

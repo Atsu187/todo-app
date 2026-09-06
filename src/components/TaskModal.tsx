@@ -14,6 +14,7 @@
 
 import type {
   Priority,
+  TaskId,
 } from '../types/task'
 
 
@@ -21,7 +22,7 @@ type Props = {
   isOpen: boolean
 
   editingTaskId:
-    number | null
+    TaskId | null
 
   title: string
 

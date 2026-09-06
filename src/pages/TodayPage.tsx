@@ -19,6 +19,7 @@ Today画面全体
 
 import type {
   Task,
+  TaskId,
   TaskDayResult,
 } from '../types/task'
 
@@ -73,19 +74,19 @@ type Props = {
   onAddTask: () => void
 
   onToggleComplete:
-    (taskId: number) => void
+    (taskId: TaskId) => void
 
   onEditTask:
     (task: Task) => void
 
   onMoveTask:
     (
-      taskId: number,
+      taskId: TaskId,
       startMinutes: number
     ) => void
 
   onUnscheduleTask:
-    (taskId: number) => void
+    (taskId: TaskId) => void
 
   onMoveRoutine:
     (

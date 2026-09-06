@@ -18,6 +18,7 @@ import {
 
 import type {
   Task,
+  TaskId,
 } from '../types/task'
 
 import type {
@@ -65,7 +66,7 @@ type Props = {
   ) => void
 
   onMoveTaskToTomorrow:
-    (taskId: number) => void
+    (taskId: TaskId) => void
 }
 
 

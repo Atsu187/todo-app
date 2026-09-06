@@ -19,6 +19,7 @@ import type {
 
 import type {
   Task,
+  TaskId,
 } from '../types/task'
 
 import type {
@@ -55,7 +56,7 @@ type Props = {
     RoutineDayState[]
 
   onToggleComplete:
-    (taskId: number) => void
+    (taskId: TaskId) => void
 
   onEditTask:
     (task: Task) => void
@@ -90,7 +91,7 @@ function TodoPanel({
     draggingTaskId,
     setDraggingTaskId,
   ] =
-    useState<number | null>(
+    useState<TaskId | null>(
       null
     )
 
