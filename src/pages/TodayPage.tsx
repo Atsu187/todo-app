@@ -30,6 +30,10 @@ import type {
   RoutineTimeOverride,
 } from '../types/routine'
 
+import type {
+  GoogleCalendarEvent,
+} from '../services/googleCalendar'
+
 import Timeline from '../components/Timeline'
 import TodoPanel from '../components/TodoPanel'
 import TodayRoutine from '../components/TodayRoutine'
@@ -70,6 +74,9 @@ type Props = {
 
   lifeLogs:
     DailyLifeLog[]
+
+  googleCalendarEvents:
+    GoogleCalendarEvent[]
 
   onAddTask: () => void
 
@@ -121,6 +128,7 @@ function TodayPage({
   routineStates,
   taskDayResults,
   lifeLogs,
+  googleCalendarEvents,
   onAddTask,
   onToggleComplete,
   onEditTask,
@@ -456,6 +464,9 @@ function TodayPage({
             }
             routineStates={
               routineStates
+            }
+            googleCalendarEvents={
+              googleCalendarEvents
             }
             onToggleComplete={
               onToggleComplete

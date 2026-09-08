@@ -37,6 +37,10 @@ import CalendarPage from './pages/CalendarPage'
 import TasksPage from './pages/TasksPage'
 import RoutinePage from './pages/RoutinePage'
 import GoogleCalendarPage from './pages/GoogleCalendarPage'
+
+import type {
+  GoogleCalendarEvent,
+} from './services/googleCalendar'
 import SettingsPage from './pages/SettingsPage'
 
 import {
@@ -2583,6 +2587,32 @@ const moveTaskOnTimeline = (
 
   /* ========================================
 
+  Google Calendar
+
+  認証トークンと取得済み予定を
+  ページ間で共有する
+
+  ======================================== */
+
+  const [
+    googleCalendarAccessToken,
+    setGoogleCalendarAccessToken,
+  ] =
+    useState<string | null>(
+      null
+    )
+
+  const [
+    googleCalendarEvents,
+    setGoogleCalendarEvents,
+  ] =
+    useState<GoogleCalendarEvent[]>(
+      []
+    )
+
+
+  /* ========================================
+
   ページ表示
 
   ======================================== */
@@ -2607,6 +2637,9 @@ const moveTaskOnTimeline = (
               taskDayResults
             }
             lifeLogs={lifeLogs}
+            googleCalendarEvents={
+              googleCalendarEvents
+            }
             onAddTask={
               openNewTaskModal
             }
@@ -2711,7 +2744,20 @@ const moveTaskOnTimeline = (
 
       case 'googleCalendar':
         return (
-          <GoogleCalendarPage />
+          <GoogleCalendarPage
+            accessToken={
+              googleCalendarAccessToken
+            }
+            events={
+              googleCalendarEvents
+            }
+            onAccessTokenChange={
+              setGoogleCalendarAccessToken
+            }
+            onEventsChange={
+              setGoogleCalendarEvents
+            }
+          />
         )
 
       case 'settings':

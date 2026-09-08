@@ -58,18 +58,28 @@ function formatEventDate(
 }
 
 
+type Props = {
+  accessToken: string | null
+  events: GoogleCalendarEvent[]
+  onAccessTokenChange:
+    (token: string | null) => void
+  onEventsChange:
+    (events: GoogleCalendarEvent[]) => void
+}
+
+
 /* ========================================
 
 Google Calendarページ
 
 ======================================== */
 
-function GoogleCalendarPage() {
-  const [accessToken, setAccessToken] =
-    useState<string | null>(null)
-
-  const [events, setEvents] =
-    useState<GoogleCalendarEvent[]>([])
+function GoogleCalendarPage({
+  accessToken,
+  events,
+  onAccessTokenChange,
+  onEventsChange,
+}: Props) {
 
   const [isLoading, setIsLoading] =
     useState(false)
@@ -134,7 +144,7 @@ function GoogleCalendarPage() {
           dateRange.endDate
         )
 
-      setEvents(
+      onEventsChange(
         calendarEvents
       )
     } catch (error) {
@@ -163,7 +173,7 @@ function GoogleCalendarPage() {
       const token =
         await requestGoogleCalendarAccessToken()
 
-      setAccessToken(token)
+      onAccessTokenChange(token)
 
       await loadEvents(token)
     } catch (error) {
@@ -191,8 +201,8 @@ function GoogleCalendarPage() {
       )
     }
 
-    setAccessToken(null)
-    setEvents([])
+    onAccessTokenChange(null)
+    onEventsChange([])
     setErrorMessage('')
   }
 

@@ -40,6 +40,10 @@ import type {
   RoutineTimeOverride,
 } from '../types/routine'
 
+import type {
+  GoogleCalendarEvent,
+} from '../services/googleCalendar'
+
 import TaskBlock from './TaskBlock'
 
 import {
@@ -72,6 +76,9 @@ type Props = {
 
   routineStates:
     RoutineDayState[]
+
+  googleCalendarEvents:
+    GoogleCalendarEvent[]
 
   onToggleComplete:
     (taskId: TaskId) => void
@@ -150,6 +157,7 @@ function Timeline({
   routines,
   routineOverrides,
   routineStates,
+  googleCalendarEvents,
   onToggleComplete,
   onEditTask,
   onMoveTask,
@@ -401,6 +409,43 @@ function Timeline({
         minuteHeight
     )
   }
+
+
+  /* ========================================
+
+  Google Calendar予定
+
+  ・時間指定の予定だけタイムライン表示
+  ・終日予定はGoogle Calendarページで確認
+  ・読み取り専用
+
+  ======================================== */
+
+  const getEventDateKey = (
+    value: string
+  ) => {
+    const eventDate =
+      new Date(value)
+
+    return [
+      eventDate.getFullYear(),
+      String(
+        eventDate.getMonth() + 1
+      ).padStart(2, '0'),
+      String(
+        eventDate.getDate()
+      ).padStart(2, '0'),
+    ].join('-')
+  }
+
+  const scheduledGoogleEvents =
+    googleCalendarEvents.filter(
+      (event) =>
+        !event.allDay &&
+        getEventDateKey(
+          event.start
+        ) === date
+    )
 
 
   /* ========================================
@@ -1379,6 +1424,105 @@ function Timeline({
           </div>
         )
       })()}
+
+
+      {/* ========================================
+
+      Google Calendar予定
+
+      読み取り専用のため
+      ドラッグ・編集は行わない
+
+      ======================================== */}
+
+      {scheduledGoogleEvents.map(
+        (event) => {
+          const startDate =
+            new Date(event.start)
+
+          const endDate =
+            new Date(event.end)
+
+          const startMinutes =
+            startDate.getHours() *
+              60 +
+            startDate.getMinutes()
+
+          const endMinutes =
+            endDate.getHours() *
+              60 +
+            endDate.getMinutes()
+
+          if (
+            startMinutes <
+              startHourOfTimeline *
+                60 ||
+            startMinutes >=
+              endHourOfTimeline *
+                60
+          ) {
+            return null
+          }
+
+          const durationMinutes =
+            Math.max(
+              10,
+              endMinutes >
+                startMinutes
+                ? endMinutes -
+                    startMinutes
+                : 10
+            )
+
+          return (
+            <a
+              key={
+                `google-${event.calendarId}-${event.id}`
+              }
+              className="google-calendar-timeline-event"
+              href={
+                event.htmlLink ??
+                undefined
+              }
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                top:
+                  `${getTopFromMinutes(
+                    startMinutes
+                  )}px`,
+
+                height:
+                  `${getHeight(
+                    durationMinutes
+                  )}px`,
+              }}
+              title={
+                `${event.calendarName} / ${event.title}`
+              }
+            >
+              <span className="google-calendar-timeline-label">
+                Google
+              </span>
+
+              <strong>
+                {event.title}
+              </strong>
+
+              <span className="google-calendar-timeline-time">
+                {minutesToTimeString(
+                  startMinutes
+                )}
+                {' - '}
+                {minutesToTimeString(
+                  startMinutes +
+                    durationMinutes
+                )}
+              </span>
+            </a>
+          )
+        }
+      )}
 
 
       {/* ========================================

@@ -655,3 +655,80 @@
 .todo-panel[data-todo-drop-zone="true"] {
   position: relative;
 }
+
+
+/* ========================================
+
+Google Calendar予定
+
+・読み取り専用
+・通常タスク / ルーティンと区別
+・クリックでGoogle Calendarを開く
+
+======================================== */
+
+.google-calendar-timeline-event {
+  position: absolute;
+  left: 74px;
+  right: 10px;
+  z-index: 3;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 20px;
+  padding: 8px 10px;
+  overflow: hidden;
+  border: 1px solid rgba(66, 133, 244, 0.35);
+  border-left: 4px solid #4285f4;
+  border-radius: 8px;
+  background: rgba(232, 240, 254, 0.92);
+  color: #24456f;
+  text-decoration: none;
+  box-shadow: 0 1px 3px rgba(31, 62, 105, 0.08);
+}
+
+.google-calendar-timeline-event:hover {
+  background: rgba(218, 231, 255, 0.97);
+}
+
+.google-calendar-timeline-event strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.google-calendar-timeline-label {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #4285f4;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.google-calendar-timeline-time {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-top: 1px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #58718f;
+}
+
+@media (max-width: 760px) {
+  .google-calendar-timeline-event {
+    left: 62px;
+    right: 6px;
+    gap: 5px;
+    padding: 4px 6px;
+  }
+
+  .google-calendar-timeline-time {
+    display: none;
+  }
+}
