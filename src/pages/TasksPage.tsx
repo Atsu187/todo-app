@@ -2,15 +2,9 @@
 
 全タスク管理ページ
 
-期限を基準に管理
-
-・今日
-・明日
-・今週
-・期限切れ
-・未完了
-・完了
-・優先度
+・期限フィルター
+・優先度フィルター
+・カテゴリフィルター
 
 ======================================== */
 
@@ -24,6 +18,10 @@ import type {
   Task,
   TaskId,
 } from '../types/task'
+
+import type {
+  TaskCategory,
+} from '../types/category'
 
 import {
   addDaysToDateKey,
@@ -49,6 +47,8 @@ type Filter =
 type Props = {
   tasks: Task[]
 
+  categories: TaskCategory[]
+
   now: Date
 
   onAddTask: () => void
@@ -61,11 +61,13 @@ type Props = {
 
   onOpenDate:
     (date: string) => void
+
 }
 
 
 function TasksPage({
   tasks,
+  categories,
   now,
   onAddTask,
   onEditTask,
@@ -73,26 +75,17 @@ function TasksPage({
   onOpenDate,
 }: Props) {
 
-  const [
-    filter,
-    setFilter,
-  ] =
-    useState<Filter>(
-      'today'
-    )
+  const [filter, setFilter] =
+    useState<Filter>('today')
 
-  const [
-    priority,
-    setPriority,
-  ] =
-    useState<Priority>(
-      '高'
-    )
+  const [priority, setPriority] =
+    useState<Priority>('高')
+
+  const [categoryFilter, setCategoryFilter] =
+    useState('all')
 
   const today =
-    getLocalDateKey(
-      now
-    )
+    getLocalDateKey(now)
 
   const tomorrow =
     addDaysToDateKey(
@@ -107,188 +100,142 @@ function TasksPage({
     )
 
 
+  const categoryMap =
+    useMemo(
+      () =>
+        new Map(
+          categories.map(
+            (category) => [
+              category.id,
+              category.name,
+            ]
+          )
+        ),
+      [categories]
+    )
+
+
   /* ========================================
 
-  タスク管理の期限判定
-
-  今日
-  → 期限切れ
-  → 今日締切
-  → 明日締切
-
-  明日
-  → 明日締切
-
-  今週
-  → 今日〜6日後
+  タスク絞り込み
 
   ======================================== */
 
   const filteredTasks =
     useMemo(
       () => {
-
         const result =
           tasks.filter(
             (task) => {
+              const categoryMatches =
+                categoryFilter === 'all' ||
+                (
+                  categoryFilter === 'none'
+                    ? !task.categoryId
+                    : task.categoryId === categoryFilter
+                )
 
-              switch (
-                filter
-              ) {
+              if (!categoryMatches) {
+                return false
+              }
 
+              switch (filter) {
                 case 'today':
                   return (
                     !task.completed &&
-                    task.dueDate !==
-                      null &&
-                    task.dueDate <=
-                      tomorrow
+                    task.dueDate !== null &&
+                    task.dueDate <= tomorrow
                   )
-
 
                 case 'tomorrow':
                   return (
                     !task.completed &&
-                    task.dueDate ===
-                      tomorrow
+                    task.dueDate === tomorrow
                   )
-
 
                 case 'week':
                   return (
                     !task.completed &&
-                    task.dueDate !==
-                      null &&
-                    task.dueDate >=
-                      today &&
-                    task.dueDate <=
-                      weekEnd
+                    task.dueDate !== null &&
+                    task.dueDate >= today &&
+                    task.dueDate <= weekEnd
                   )
-
 
                 case 'overdue':
                   return (
                     !task.completed &&
-                    task.dueDate !==
-                      null &&
-                    task.dueDate <
-                      today
+                    task.dueDate !== null &&
+                    task.dueDate < today
                   )
-
 
                 case 'incomplete':
-                  return (
-                    !task.completed
-                  )
-
+                  return !task.completed
 
                 case 'completed':
-                  return (
-                    task.completed
-                  )
-
+                  return task.completed
 
                 case 'priority':
-                  return (
-                    task.priority ===
-                    priority
-                  )
+                  return task.priority === priority
               }
             }
           )
 
+        return [...result]
+          .sort(
+            (first, second) => {
+              const firstDueDate =
+                first.dueDate ?? '9999-12-31'
 
-        /* ========================================
+              const secondDueDate =
+                second.dueDate ?? '9999-12-31'
 
-        並び順
+              const dueCompare =
+                firstDueDate.localeCompare(
+                  secondDueDate
+                )
 
-        1. 期限
-        2. 実行日
-        3. 開始時刻
+              if (dueCompare !== 0) {
+                return dueCompare
+              }
 
-        期限なしは最後
+              const firstTaskDate =
+                first.taskDate || '9999-12-31'
 
-        ======================================== */
+              const secondTaskDate =
+                second.taskDate || '9999-12-31'
 
-        return [
-          ...result,
-        ].sort(
-          (
-            first,
-            second
-          ) => {
+              const dateCompare =
+                firstTaskDate.localeCompare(
+                  secondTaskDate
+                )
 
-            const firstDueDate =
-              first.dueDate ??
-              '9999-12-31'
+              if (dateCompare !== 0) {
+                return dateCompare
+              }
 
-            const secondDueDate =
-              second.dueDate ??
-              '9999-12-31'
+              const firstMinutes =
+                first.startHour === null ||
+                first.startMinute === null
+                  ? Number.MAX_SAFE_INTEGER
+                  : first.startHour * 60 +
+                    first.startMinute
 
-            const dueCompare =
-              firstDueDate.localeCompare(
-                secondDueDate
-              )
+              const secondMinutes =
+                second.startHour === null ||
+                second.startMinute === null
+                  ? Number.MAX_SAFE_INTEGER
+                  : second.startHour * 60 +
+                    second.startMinute
 
-            if (
-              dueCompare !==
-              0
-            ) {
-              return (
-                dueCompare
-              )
+              return firstMinutes - secondMinutes
             }
-
-
-            const dateCompare =
-              first.taskDate.localeCompare(
-                second.taskDate
-              )
-
-            if (
-              dateCompare !==
-              0
-            ) {
-              return (
-                dateCompare
-              )
-            }
-
-
-            const firstMinutes =
-              first.startHour ===
-                null ||
-              first.startMinute ===
-                null
-                ? Number.MAX_SAFE_INTEGER
-                : first.startHour *
-                    60 +
-                  first.startMinute
-
-
-            const secondMinutes =
-              second.startHour ===
-                null ||
-              second.startMinute ===
-                null
-                ? Number.MAX_SAFE_INTEGER
-                : second.startHour *
-                    60 +
-                  second.startMinute
-
-
-            return (
-              firstMinutes -
-              secondMinutes
-            )
-          }
-        )
+          )
       },
       [
         tasks,
         filter,
         priority,
+        categoryFilter,
         today,
         tomorrow,
         weekEnd,
@@ -296,62 +243,26 @@ function TasksPage({
     )
 
 
-  /* ========================================
-
-  フィルターボタン
-
-  ======================================== */
-
   const filters:
     Array<{
       value: Filter
       label: string
     }> = [
-      {
-        value: 'today',
-        label: '今日',
-      },
-      {
-        value: 'tomorrow',
-        label: '明日',
-      },
-      {
-        value: 'week',
-        label: '今週',
-      },
-      {
-        value: 'overdue',
-        label: '期限切れ',
-      },
-      {
-        value: 'incomplete',
-        label: '未完了',
-      },
-      {
-        value: 'completed',
-        label: '完了',
-      },
-      {
-        value: 'priority',
-        label: '優先度',
-      },
+      { value: 'today', label: '今日' },
+      { value: 'tomorrow', label: '明日' },
+      { value: 'week', label: '今週' },
+      { value: 'overdue', label: '期限切れ' },
+      { value: 'incomplete', label: '未完了' },
+      { value: 'completed', label: '完了' },
+      { value: 'priority', label: '優先度' },
     ]
 
 
   return (
     <div className="tasks-page">
 
-
-      {/* ========================================
-
-      ページ上部
-
-      ======================================== */}
-
       <div className="tasks-page-header">
-
         <div>
-
           <p className="eyebrow">
             Tasks
           </p>
@@ -359,331 +270,221 @@ function TasksPage({
           <h1>
             タスク管理
           </h1>
-
         </div>
 
-
-        <button
-          type="button"
-          className="add-button"
-          onClick={
-            onAddTask
-          }
-        >
-          ＋ タスクを追加
-        </button>
-
+        <div className="tasks-page-header-actions">
+          <button
+            type="button"
+            className="add-button"
+            onClick={onAddTask}
+          >
+            ＋ タスクを追加
+          </button>
+        </div>
       </div>
 
 
-      {/* ========================================
-
-      フィルター
-
-      ======================================== */}
-
       <div className="task-filter-bar">
-
         {filters.map(
           (item) => (
-
             <button
               type="button"
-              key={
-                item.value
-              }
+              key={item.value}
               className={
-                filter ===
-                item.value
+                filter === item.value
                   ? 'task-filter-button active'
                   : 'task-filter-button'
               }
               onClick={() =>
-                setFilter(
-                  item.value
-                )
+                setFilter(item.value)
               }
             >
-              {
-                item.label
-              }
+              {item.label}
             </button>
-
           )
         )}
 
-
-        {filter ===
-          'priority' && (
-
+        {filter === 'priority' && (
           <select
             className="priority-filter-select"
-            value={
-              priority
-            }
+            value={priority}
             onChange={(event) =>
               setPriority(
-                event
-                  .target
-                  .value as Priority
+                event.target.value as Priority
               )
             }
           >
-
-            <option value="高">
-              高
-            </option>
-
-            <option value="中">
-              中
-            </option>
-
-            <option value="低">
-              低
-            </option>
-
+            <option value="高">高</option>
+            <option value="中">中</option>
+            <option value="低">低</option>
           </select>
-
         )}
 
-      </div>
-
-
-      {/* ========================================
-
-      件数
-
-      ======================================== */}
-
-      <div
-        style={{
-          marginBottom:
-            '12px',
-        }}
-      >
-
-        <span className="tasks-count">
-          {
-            filteredTasks.length
+        <select
+          className="priority-filter-select"
+          value={categoryFilter}
+          onChange={(event) =>
+            setCategoryFilter(
+              event.target.value
+            )
           }
-          件
-        </span>
+        >
+          <option value="all">
+            すべてのカテゴリ
+          </option>
 
+          <option value="none">
+            カテゴリなし
+          </option>
+
+          {categories.map(
+            (category) => (
+              <option
+                key={category.id}
+                value={category.id}
+              >
+                {category.name}
+              </option>
+            )
+          )}
+        </select>
       </div>
 
 
-      {/* ========================================
+      <div style={{ marginBottom: '12px' }}>
+        <span className="tasks-count">
+          {filteredTasks.length}件
+        </span>
+      </div>
 
-      タスク一覧
-
-      ======================================== */}
 
       <div className="task-management-list">
-
         {filteredTasks.map(
           (task) => {
-
             const timeText =
-              task.startHour !==
-                null &&
-              task.startMinute !==
-                null
+              task.startHour !== null &&
+              task.startMinute !== null
                 ? formatTime(
                     task.startHour,
                     task.startMinute
                   )
                 : '時刻未設定'
 
-
             const isOverdue =
               !task.completed &&
-              task.dueDate !==
-                null &&
-              task.dueDate <
-                today
-
+              task.dueDate !== null &&
+              task.dueDate < today
 
             const isDueToday =
               !task.completed &&
-              task.dueDate ===
-                today
-
+              task.dueDate === today
 
             const isDueTomorrow =
               !task.completed &&
-              task.dueDate ===
-                tomorrow
-
+              task.dueDate === tomorrow
 
             let dueText =
               task.dueDate
-                ? formatMonthDay(
-                    task.dueDate
-                  )
+                ? formatMonthDay(task.dueDate)
                 : 'なし'
 
-
             if (isOverdue) {
-              dueText =
-                `期限切れ ${dueText}`
-            } else if (
-              isDueToday
-            ) {
-              dueText =
-                `今日 ${dueText}`
-            } else if (
-              isDueTomorrow
-            ) {
-              dueText =
-                `明日 ${dueText}`
+              dueText = `期限切れ ${dueText}`
+            } else if (isDueToday) {
+              dueText = `今日 ${dueText}`
+            } else if (isDueTomorrow) {
+              dueText = `明日 ${dueText}`
             }
 
+            const categoryName =
+              task.categoryId
+                ? categoryMap.get(task.categoryId) ?? '削除済み'
+                : 'なし'
 
             return (
               <div
                 className={[
                   'task-management-row',
-
                   task.completed
                     ? 'completed'
                     : '',
                 ]
-                  .filter(
-                    Boolean
-                  )
-                  .join(
-                    ' '
-                  )
-                }
-                key={
-                  task.id
-                }
+                  .filter(Boolean)
+                  .join(' ')}
+                key={task.id}
               >
-
-
                 <input
                   type="checkbox"
-                  checked={
-                    task.completed
-                  }
+                  checked={task.completed}
                   onChange={() =>
-                    onToggleComplete(
-                      task.id
-                    )
+                    onToggleComplete(task.id)
                   }
                 />
-
-
-                {/* ========================================
-
-                タスク情報
-
-                実行日と期限を
-                分けて表示
-
-                ======================================== */}
 
                 <button
                   type="button"
                   className="task-management-main"
                   onClick={() =>
-                    onEditTask(
-                      task
-                    )
+                    onEditTask(task)
                   }
                 >
-
                   <strong>
-                    {
-                      task.title
-                    }
+                    {task.title}
                   </strong>
 
                   <span>
                     実行日：
                     {
-                      formatMonthDay(
-                        task.taskDate
-                      )
+                      task.taskDate
+                        ? formatMonthDay(task.taskDate)
+                        : '日付なし'
                     }
-
                     {' ・ '}
-
-                    {
-                      timeText
-                    }
-
+                    {timeText}
                     {' ・ '}
-
-                    {
-                      task.durationMinutes
-                    }
-                    分
+                    {task.durationMinutes}分
+                    {' ・ '}
+                    カテゴリ：{categoryName}
                   </span>
-
                 </button>
 
-
                 <span className="task-management-deadline">
-
-                  期限：
-                  {
-                    dueText
-                  }
-
+                  期限：{dueText}
                 </span>
-
 
                 <span className="task-management-priority">
-
-                  優先度：
-                  {
-                    task.priority
-                  }
-
+                  優先度：{task.priority}
                 </span>
-
 
                 <button
                   type="button"
                   className="task-open-date-button"
-                  onClick={() =>
-                    onOpenDate(
-                      task.taskDate
-                    )
-                  }
+                  disabled={!task.taskDate}
+                  onClick={() => {
+                    if (task.taskDate) {
+                      onOpenDate(task.taskDate)
+                    }
+                  }}
                 >
-                  実行日を開く
+                  {
+                    task.taskDate
+                      ? '実行日を開く'
+                      : '日付なし'
+                  }
                 </button>
-
               </div>
             )
           }
         )}
 
-
-        {/* ========================================
-
-        該当タスクなし
-
-        ======================================== */}
-
-        {
-          filteredTasks.length ===
-            0 && (
-
-            <div className="task-management-empty">
-              該当するタスクはありません。
-            </div>
-
-          )
-        }
-
+        {filteredTasks.length === 0 && (
+          <div className="task-management-empty">
+            該当するタスクはありません。
+          </div>
+        )}
       </div>
-
     </div>
   )
 }
-
 
 export default TasksPage

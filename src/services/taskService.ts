@@ -21,7 +21,7 @@ type TaskRow = {
   id: string
   user_id: string
   title: string
-  task_date: string
+  task_date: string | null
   due_date: string | null
   start_time: string | null
   duration: number
@@ -29,6 +29,9 @@ type TaskRow = {
   completed: boolean
   memo: string
   completed_date: string | null
+  category_id: string | null
+  google_event_id: string | null
+  google_calendar_id: string | null
 }
 
 
@@ -127,7 +130,7 @@ const fromTaskRow = (
       row.due_date,
 
     taskDate:
-      row.task_date,
+      row.task_date ?? '',
 
     startHour,
 
@@ -145,6 +148,15 @@ const fromTaskRow = (
 
     completedDate:
       row.completed_date,
+
+    categoryId:
+      row.category_id,
+
+    googleEventId:
+      row.google_event_id,
+
+    googleCalendarId:
+      row.google_calendar_id,
   }
 }
 
@@ -243,7 +255,7 @@ export const createTask =
             task.title,
 
           task_date:
-            task.taskDate,
+            task.taskDate || null,
 
           due_date:
             task.dueDate,
@@ -265,6 +277,15 @@ export const createTask =
 
           completed_date:
             task.completedDate,
+
+          category_id:
+            task.categoryId,
+
+          google_event_id:
+            task.googleEventId,
+
+          google_calendar_id:
+            task.googleCalendarId,
         })
         .select()
         .single()
@@ -309,7 +330,7 @@ export const updateTask =
             task.title,
 
           task_date:
-            task.taskDate,
+            task.taskDate || null,
 
           due_date:
             task.dueDate,
@@ -331,6 +352,15 @@ export const updateTask =
 
           completed_date:
             task.completedDate,
+
+          category_id:
+            task.categoryId,
+
+          google_event_id:
+            task.googleEventId,
+
+          google_calendar_id:
+            task.googleCalendarId,
         })
         .eq(
           'id',

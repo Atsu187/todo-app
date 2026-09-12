@@ -17,6 +17,10 @@ import type {
   TaskId,
 } from '../types/task'
 
+import type {
+  TaskCategory,
+} from '../types/category'
+
 
 type Props = {
   isOpen: boolean
@@ -26,7 +30,13 @@ type Props = {
 
   title: string
 
+  categoryId: string
+
+  categories: TaskCategory[]
+
   taskDate: string
+
+  taskDateFallback: string
 
   durationMinutes: number
 
@@ -43,6 +53,9 @@ type Props = {
   memo: string
 
   setTitle:
+    (value: string) => void
+
+  setCategoryId:
     (value: string) => void
 
   setTaskDate:
@@ -81,7 +94,10 @@ function TaskModal({
   isOpen,
   editingTaskId,
   title,
+  categoryId,
+  categories,
   taskDate,
+  taskDateFallback,
   durationMinutes,
   priority,
   hasDeadline,
@@ -90,6 +106,7 @@ function TaskModal({
   endTime,
   memo,
   setTitle,
+  setCategoryId,
   setTaskDate,
   setPriority,
   setHasDeadline,
@@ -231,36 +248,42 @@ const durationOptions = [
 
         {/* ========================================
 
-        実行日
-
-        「いつ行うか」
-
-        Today・タイムラインで使用
+        カテゴリ
 
         ======================================== */}
 
         <div className="form-group">
 
           <label>
-            いつ行う？
-
-            <span className="required">
-              *
-            </span>
+            カテゴリ
           </label>
 
-          <input
-            type="date"
-            value={taskDate}
+          <select
+            value={categoryId}
             onChange={(event) =>
-              setTaskDate(
+              setCategoryId(
                 event.target.value
               )
             }
-          />
+          >
+            <option value="">
+              カテゴリなし
+            </option>
+
+            {categories.map(
+              (category) => (
+                <option
+                  key={category.id}
+                  value={category.id}
+                >
+                  {category.name}
+                </option>
+              )
+            )}
+          </select>
 
           <p className="form-help">
-            この日にToday・タイムラインへ表示されます。
+            カテゴリは「設定」から追加・削除できます。
           </p>
 
         </div>
@@ -393,67 +416,6 @@ const durationOptions = [
 
         {/* ========================================
 
-        開始時刻・終了時刻
-
-        10分単位
-
-        ======================================== */}
-
-        <div className="time-form-row">
-
-          <div className="form-group">
-
-            <label>
-              開始時刻
-            </label>
-
-            <input
-              type="time"
-              step={600}
-              value={startTime}
-              onChange={(event) =>
-                onStartTimeChange(
-                  event.target.value
-                )
-              }
-            />
-
-          </div>
-
-          <div className="time-arrow">
-            →
-          </div>
-
-          <div className="form-group">
-
-            <label>
-              終了時刻
-            </label>
-
-            <input
-              type="time"
-              step={600}
-              value={endTime}
-              disabled={!startTime}
-              onChange={(event) =>
-                onEndTimeChange(
-                  event.target.value
-                )
-              }
-            />
-
-          </div>
-
-        </div>
-
-        <p className="form-help time-help">
-          時刻は10分単位で設定します。
-          開始時刻を入力すると、予定時間から終了時刻を自動計算します。
-        </p>
-
-
-        {/* ========================================
-
         優先度
 
         ======================================== */}
@@ -508,6 +470,152 @@ const durationOptions = [
           </div>
 
         </div>
+
+
+        {/* ========================================
+
+        実行日
+
+        「いつ行うか」
+
+        日付なしも選択可能
+
+        ======================================== */}
+
+        <div className="form-group">
+
+          <label>
+            いつ行う？
+          </label>
+
+          <div className="deadline-options">
+
+            <label className="radio-option">
+
+              <input
+                type="radio"
+                name="task-date"
+                checked={Boolean(taskDate)}
+                onChange={() =>
+                  setTaskDate(
+                    taskDate ||
+                    taskDateFallback
+                  )
+                }
+              />
+
+              <span>
+                日付を指定
+              </span>
+
+            </label>
+
+            <label className="radio-option">
+
+              <input
+                type="radio"
+                name="task-date"
+                checked={!taskDate}
+                onChange={() => {
+                  setTaskDate('')
+                  onStartTimeChange('')
+                }}
+              />
+
+              <span>
+                日付なし
+              </span>
+
+            </label>
+
+          </div>
+
+          {taskDate && (
+
+            <input
+              type="date"
+              value={taskDate}
+              onChange={(event) =>
+                setTaskDate(
+                  event.target.value
+                )
+              }
+            />
+
+          )}
+
+          <p className="form-help">
+            日付を指定すると、その日のToday・タイムラインに表示されます。
+            日付なしの場合は「未完了のToDo」に表示されます。
+          </p>
+
+        </div>
+
+
+        {/* ========================================
+
+        開始時刻・終了時刻
+
+        10分単位
+
+        ======================================== */}
+
+        <div className="time-form-row">
+
+          <div className="form-group">
+
+            <label>
+              開始時刻
+            </label>
+
+            <input
+              type="time"
+              step={600}
+              value={startTime}
+              disabled={!taskDate}
+              onChange={(event) =>
+                onStartTimeChange(
+                  event.target.value
+                )
+              }
+            />
+
+          </div>
+
+          <div className="time-arrow">
+            →
+          </div>
+
+          <div className="form-group">
+
+            <label>
+              終了時刻
+            </label>
+
+            <input
+              type="time"
+              step={600}
+              value={endTime}
+              disabled={
+                !taskDate ||
+                !startTime
+              }
+              onChange={(event) =>
+                onEndTimeChange(
+                  event.target.value
+                )
+              }
+            />
+
+          </div>
+
+        </div>
+
+        <p className="form-help time-help">
+          日付なしの場合は時刻を設定できません。
+          日付を指定した場合、時刻は10分単位で設定します。
+          開始時刻を入力すると、予定時間から終了時刻を自動計算します。
+        </p>
 
 
         {/* ========================================

@@ -3,20 +3,32 @@
 Google Calendarとの通信処理
 
 ・Google Identity Servicesの読み込み
-・Googleアカウントの認証
+・Authorization Codeの取得
+・Supabase Edge Functionとの認証連携
 ・カレンダー一覧取得
 ・予定取得
 
 ======================================== */
 
+import {
+  supabase,
+} from './supabase'
+
+
 const GOOGLE_IDENTITY_SCRIPT_URL =
   'https://accounts.google.com/gsi/client'
 
 const GOOGLE_CALENDAR_SCOPE =
-  'https://www.googleapis.com/auth/calendar.readonly'
+  [
+    'https://www.googleapis.com/auth/calendar.events',
+    'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+  ].join(' ')
 
 const GOOGLE_CALENDAR_API_BASE =
   'https://www.googleapis.com/calendar/v3'
+
+const GOOGLE_AUTH_FUNCTION =
+  'google-calendar-auth'
 
 
 /* ========================================
@@ -25,18 +37,21 @@ Google APIで使用する型
 
 ======================================== */
 
-type GoogleTokenResponse = {
-  access_token?: string
+type GoogleCodeResponse = {
+  code?: string
   error?: string
   error_description?: string
 }
 
-type GoogleTokenClient = {
-  requestAccessToken: (
-    options?: {
-      prompt?: string
-    }
-  ) => void
+type GoogleCodeClient = {
+  requestCode: () => void
+}
+
+type GoogleCalendarAuthResponse = {
+  connected?: boolean
+  accessToken?: string
+  expiresIn?: number
+  error?: string
 }
 
 type GoogleCalendarListEntry = {
@@ -94,18 +109,20 @@ declare global {
     google?: {
       accounts: {
         oauth2: {
-          initTokenClient: (
+          initCodeClient: (
             config: {
               client_id: string
               scope: string
+              ux_mode: 'popup'
+              prompt?: string
               callback: (
-                response: GoogleTokenResponse
+                response: GoogleCodeResponse
               ) => void
               error_callback?: (
                 error: unknown
               ) => void
             }
-          ) => GoogleTokenClient
+          ) => GoogleCodeClient
           revoke: (
             token: string,
             done?: () => void
@@ -202,11 +219,13 @@ function loadGoogleIdentityScript() {
 
 /* ========================================
 
-Google Calendarの読み取り権限を取得
+GoogleからAuthorization Codeを取得
+
+初回接続時のみユーザー操作が必要
 
 ======================================== */
 
-export async function requestGoogleCalendarAccessToken() {
+export async function requestGoogleCalendarAuthorizationCode() {
   const clientId =
     import.meta.env.VITE_GOOGLE_CLIENT_ID
 
@@ -229,17 +248,19 @@ export async function requestGoogleCalendarAccessToken() {
 
   return new Promise<string>(
     (resolve, reject) => {
-      const tokenClient =
-        oauth2.initTokenClient({
+      const codeClient =
+        oauth2.initCodeClient({
           client_id: clientId,
           scope: GOOGLE_CALENDAR_SCOPE,
+          ux_mode: 'popup',
+          prompt: 'consent',
 
           callback: (
             response
           ) => {
             if (
               response.error ||
-              !response.access_token
+              !response.code
             ) {
               reject(
                 new Error(
@@ -253,7 +274,7 @@ export async function requestGoogleCalendarAccessToken() {
             }
 
             resolve(
-              response.access_token
+              response.code
             )
           },
 
@@ -266,11 +287,157 @@ export async function requestGoogleCalendarAccessToken() {
           },
         })
 
-      tokenClient.requestAccessToken({
-        prompt: '',
-      })
+      codeClient.requestCode()
     }
   )
+}
+
+
+/* ========================================
+
+Edge Function共通呼び出し
+
+======================================== */
+
+async function invokeGoogleCalendarAuth(
+  body: Record<string, unknown>
+) {
+  const {
+    data,
+    error,
+  } = await supabase.functions.invoke<GoogleCalendarAuthResponse>(
+    GOOGLE_AUTH_FUNCTION,
+    {
+      body,
+      headers: {
+        'X-Requested-With':
+          'XmlHttpRequest',
+      },
+    }
+  )
+
+  if (error) {
+    throw new Error(
+      error.message ||
+      'Google Calendarの認証処理に失敗しました。'
+    )
+  }
+
+  if (data?.error) {
+    throw new Error(
+      data.error
+    )
+  }
+
+  return data
+}
+
+
+/* ========================================
+
+初回Authorization Codeを交換
+
+Refresh TokenはEdge Function側で保存
+
+======================================== */
+
+export async function exchangeGoogleCalendarAuthorizationCode(
+  code: string
+) {
+  const data =
+    await invokeGoogleCalendarAuth({
+      action: 'exchange',
+      code,
+      origin: window.location.origin,
+    })
+
+  if (!data?.accessToken) {
+    throw new Error(
+      'Googleのアクセストークンを取得できませんでした。'
+    )
+  }
+
+  return data.accessToken
+}
+
+
+/* ========================================
+
+保存済みRefresh Tokenから自動再接続
+
+======================================== */
+
+export async function refreshGoogleCalendarAccessToken() {
+  const data =
+    await invokeGoogleCalendarAuth({
+      action: 'refresh',
+    })
+
+  if (
+    data?.connected === false ||
+    !data?.accessToken
+  ) {
+    return null
+  }
+
+  return data.accessToken
+}
+
+
+/* ========================================
+
+現在のAccess Tokenに
+Google Calendar書き込み権限があるか確認
+
+古いRefresh Tokenが読み取り専用のままの場合を
+判別するために使用する
+
+======================================== */
+
+export async function hasGoogleCalendarWriteAccess(
+  accessToken: string
+) {
+  const response = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+  )
+
+  if (!response.ok) {
+    return false
+  }
+
+  const data =
+    await response.json() as {
+      scope?: string
+    }
+
+  const scopes =
+    new Set(
+      (data.scope ?? '')
+        .split(' ')
+        .filter(Boolean)
+    )
+
+  return (
+    scopes.has(
+      'https://www.googleapis.com/auth/calendar.events'
+    ) ||
+    scopes.has(
+      'https://www.googleapis.com/auth/calendar'
+    )
+  )
+}
+
+
+/* ========================================
+
+保存済みGoogle接続情報を削除
+
+======================================== */
+
+export async function disconnectStoredGoogleCalendar() {
+  await invokeGoogleCalendarAuth({
+    action: 'disconnect',
+  })
 }
 
 
@@ -509,5 +676,198 @@ export function revokeGoogleCalendarAccess(
 
   oauth2.revoke(
     accessToken
+  )
+}
+
+
+/* ========================================
+
+TaskをGoogle Calendarへ書き込む
+
+メインカレンダー primary を使用する
+
+======================================== */
+
+type GoogleWritableEventResponse = {
+  id: string
+  htmlLink?: string
+}
+
+const googleCalendarWriteFetch = async <T>(
+  path: string,
+  accessToken: string,
+  init: RequestInit
+): Promise<T | null> => {
+  const response = await fetch(
+    `${GOOGLE_CALENDAR_API_BASE}${path}`,
+    {
+      ...init,
+      headers: {
+        Authorization:
+          `Bearer ${accessToken}`,
+        'Content-Type':
+          'application/json',
+        ...(init.headers ?? {}),
+      },
+    }
+  )
+
+  if (!response.ok) {
+    const details =
+      await response.text()
+
+    if (
+      response.status === 401 ||
+      response.status === 403
+    ) {
+      throw new Error(
+        'Google Calendarへの書き込み権限がありません。接続解除後、もう一度接続してください。'
+      )
+    }
+
+    throw new Error(
+      `Google Calendarへの書き込みに失敗しました。（${response.status}）${details ? ` ${details}` : ''}`
+    )
+  }
+
+  if (response.status === 204) {
+    return null
+  }
+
+  return response.json() as Promise<T>
+}
+
+export const createGoogleCalendarTaskEvent = async ({
+  accessToken,
+  taskId,
+  title,
+  memo,
+  taskDate,
+  startHour,
+  startMinute,
+  durationMinutes,
+}: {
+  accessToken: string
+  taskId: string
+  title: string
+  memo: string
+  taskDate: string
+  startHour: number
+  startMinute: number
+  durationMinutes: number
+}) => {
+  const start =
+    new Date(
+      `${taskDate}T${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}:00`
+    )
+
+  const end = new Date(start)
+  end.setMinutes(
+    end.getMinutes() + durationMinutes
+  )
+
+  const data =
+    await googleCalendarWriteFetch<GoogleWritableEventResponse>(
+      '/calendars/primary/events',
+      accessToken,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          summary: title,
+          description:
+            memo || 'My ToDoから同期',
+          start: {
+            dateTime: start.toISOString(),
+          },
+          end: {
+            dateTime: end.toISOString(),
+          },
+          extendedProperties: {
+            private: {
+              todoTaskId: taskId,
+            },
+          },
+        }),
+      }
+    )
+
+  if (!data?.id) {
+    throw new Error(
+      'Google Calendar予定のIDを取得できませんでした。'
+    )
+  }
+
+  return {
+    eventId: data.id,
+    calendarId: 'primary',
+  }
+}
+
+export const updateGoogleCalendarTaskEvent = async ({
+  accessToken,
+  calendarId,
+  eventId,
+  title,
+  memo,
+  taskDate,
+  startHour,
+  startMinute,
+  durationMinutes,
+}: {
+  accessToken: string
+  calendarId: string
+  eventId: string
+  title: string
+  memo: string
+  taskDate: string
+  startHour: number
+  startMinute: number
+  durationMinutes: number
+}) => {
+  const start =
+    new Date(
+      `${taskDate}T${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}:00`
+    )
+
+  const end = new Date(start)
+  end.setMinutes(
+    end.getMinutes() + durationMinutes
+  )
+
+  await googleCalendarWriteFetch<GoogleWritableEventResponse>(
+    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    accessToken,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        summary: title,
+        description:
+          memo || 'My ToDoから同期',
+        start: {
+          dateTime: start.toISOString(),
+        },
+        end: {
+          dateTime: end.toISOString(),
+        },
+      }),
+    }
+  )
+}
+
+export const deleteGoogleCalendarTaskEvent = async ({
+  accessToken,
+  calendarId,
+  eventId,
+}: {
+  accessToken: string
+  calendarId: string
+  eventId: string
+}) => {
+  await googleCalendarWriteFetch<never>(
+    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    accessToken,
+    {
+      method: 'DELETE',
+    }
   )
 }

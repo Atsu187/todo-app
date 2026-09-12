@@ -45,6 +45,12 @@ export type Task = {
 
   taskDate: string
 
+  categoryId: string | null
+
+  googleEventId: string | null
+
+  googleCalendarId: string | null
+
   startHour: number | null
 
   startMinute: number | null

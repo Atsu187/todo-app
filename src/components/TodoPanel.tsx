@@ -1,6 +1,6 @@
 /* ========================================
 
-右側の「今日のToDo」
+右側の「未完了のToDo」
 
 ・時間未設定の通常タスク
 ・時間未設定のルーティン
@@ -105,7 +105,7 @@ function TodoPanel({
   const unscheduledTasks =
     tasks.filter(
       (task) =>
-        task.taskDate === date &&
+        !task.completed &&
         (
           task.startHour === null ||
           task.startMinute === null
@@ -121,12 +121,25 @@ function TodoPanel({
 
   const unscheduledRoutines =
     routines.filter(
-      (routine) =>
-        getRoutineTimeForDate(
-          routine,
-          date,
-          routineOverrides
-        ) === null
+      (routine) => {
+        const state =
+          routineStates.find(
+            (item) =>
+              item.date === date &&
+              item.routineId ===
+                routine.id
+          )
+
+        return (
+          getRoutineTimeForDate(
+            routine,
+            date,
+            routineOverrides
+          ) === null &&
+          !state?.completed &&
+          !state?.skipped
+        )
+      }
     )
 
 
@@ -193,11 +206,11 @@ function TodoPanel({
         <div>
 
           <p className="eyebrow">
-            Unscheduled
+            Incomplete
           </p>
 
           <h2>
-            今日のToDo
+            未完了のToDo
           </h2>
 
         </div>
@@ -447,7 +460,7 @@ function TodoPanel({
           0 && (
 
           <div className="todo-empty">
-            時間未設定のToDoはありません。
+            未完了の時間未設定ToDoはありません。
           </div>
 
         )}

@@ -38,10 +38,25 @@ import TasksPage from './pages/TasksPage'
 import RoutinePage from './pages/RoutinePage'
 import GoogleCalendarPage from './pages/GoogleCalendarPage'
 
+import {
+  fetchGoogleCalendarEvents,
+  refreshGoogleCalendarAccessToken,
+} from './services/googleCalendar'
+
 import type {
   GoogleCalendarEvent,
 } from './services/googleCalendar'
 import SettingsPage from './pages/SettingsPage'
+
+import {
+  createCategory,
+  deleteCategory,
+  fetchCategories,
+} from './services/categoryService'
+
+import type {
+  TaskCategory,
+} from './types/category'
 
 import {
   supabase,
@@ -246,6 +261,46 @@ function TodoApp() {
       'todo-app-tasks-v2',
       mockTasks
     )
+
+
+  /* ========================================
+
+  カテゴリ
+
+  ======================================== */
+
+  const [categories, setCategories] =
+    useState<TaskCategory[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadCategories = async () => {
+      try {
+        const loadedCategories =
+          await fetchCategories()
+
+        if (cancelled) {
+          return
+        }
+
+        setCategories(
+          loadedCategories
+        )
+      } catch (error) {
+        console.error(
+          'カテゴリの読み込みに失敗しました',
+          error
+        )
+      }
+    }
+
+    void loadCategories()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
 
   /* ========================================
@@ -1533,7 +1588,16 @@ function TodoApp() {
   const [title, setTitle] =
     useState('')
 
+  const [categoryId, setCategoryId] =
+    useState('')
+
   const [taskDate, setTaskDate] =
+    useState(selectedDate)
+
+  const [
+    taskDateFallback,
+    setTaskDateFallback,
+  ] =
     useState(selectedDate)
 
   const [durationMinutes, setDurationMinutes] =
@@ -1596,6 +1660,7 @@ function TodoApp() {
       tasks.filter(
         (task) =>
           !task.completed &&
+          Boolean(task.taskDate) &&
           isDateBefore(
             task.taskDate,
             todayDate
@@ -1644,6 +1709,7 @@ function TodoApp() {
         current.map(
           (task) =>
             !task.completed &&
+            Boolean(task.taskDate) &&
             isDateBefore(
               task.taskDate,
               todayDate
@@ -1674,7 +1740,11 @@ function TodoApp() {
 
   const resetForm = () => {
     setTitle('')
+    setCategoryId('')
     setTaskDate(selectedDate)
+    setTaskDateFallback(
+      selectedDate
+    )
     setDurationMinutes(60)
     setPriority('中')
     setHasDeadline(true)
@@ -1704,6 +1774,9 @@ function TodoApp() {
   const openNewTaskModal = () => {
     resetForm()
     setTaskDate(selectedDate)
+    setTaskDateFallback(
+      selectedDate
+    )
     setIsModalOpen(true)
   }
 
@@ -1720,6 +1793,9 @@ function TodoApp() {
   const openNewTaskModalForToday = () => {
     resetForm()
     setTaskDate(todayDate)
+    setTaskDateFallback(
+      todayDate
+    )
     setIsModalOpen(true)
   }
 
@@ -1735,7 +1811,14 @@ function TodoApp() {
   ) => {
     setEditingTaskId(task.id)
     setTitle(task.title)
+    setCategoryId(
+      task.categoryId ?? ''
+    )
     setTaskDate(task.taskDate)
+    setTaskDateFallback(
+      task.taskDate ||
+      todayDate
+    )
     setDurationMinutes(
       task.durationMinutes
     )
@@ -1909,13 +1992,6 @@ function TodoApp() {
       return null
     }
 
-    if (!taskDate) {
-      alert(
-        'いつ行うかを入力してください'
-      )
-      return null
-    }
-
     if (
       hasDeadline &&
       !dueDate
@@ -1945,7 +2021,10 @@ function TodoApp() {
     let taskEndMinute:
       number | null = null
 
-    if (startTime) {
+    if (
+      taskDate &&
+      startTime
+    ) {
       const startMinutes =
         timeStringToMinutes(
           startTime
@@ -2005,6 +2084,12 @@ function TodoApp() {
           ? dueDate
           : null,
       taskDate,
+      categoryId:
+        categoryId || null,
+      googleEventId:
+        existingTask?.googleEventId ?? null,
+      googleCalendarId:
+        existingTask?.googleCalendarId ?? null,
       startHour: taskStartHour,
       startMinute: taskStartMinute,
       endHour: taskEndHour,
@@ -2321,31 +2406,33 @@ const moveTaskOnTimeline = (
         )
     )
 
-    setTaskDayResults(
-      (current) => {
-        const next =
-          current.filter(
-            (result) =>
-              !(
-                result.date ===
-                  target.taskDate &&
-                result.taskId ===
-                  target.id
-              )
-          )
+    if (target.taskDate) {
+      setTaskDayResults(
+        (current) => {
+          const next =
+            current.filter(
+              (result) =>
+                !(
+                  result.date ===
+                    target.taskDate &&
+                  result.taskId ===
+                    target.id
+                )
+            )
 
-        return [
-          ...next,
-          {
-            date: target.taskDate,
-            taskId: target.id,
-            title: target.title,
-            completed:
-              nextCompleted,
-          },
-        ]
-      }
-    )
+          return [
+            ...next,
+            {
+              date: target.taskDate,
+              taskId: target.id,
+              title: target.title,
+              completed:
+                nextCompleted,
+            },
+          ]
+        }
+      )
+    }
   }
 
 
@@ -2587,6 +2674,57 @@ const moveTaskOnTimeline = (
 
   /* ========================================
 
+  カテゴリ設定
+
+  ======================================== */
+
+  const addCategory = async (
+    name: string
+  ) => {
+    const saved =
+      await createCategory(name)
+
+    setCategories(
+      (current) => [
+        ...current,
+        saved,
+      ]
+    )
+  }
+
+
+  const removeCategory = async (
+    targetCategoryId: string
+  ) => {
+    await deleteCategory(
+      targetCategoryId
+    )
+
+    setCategories(
+      (current) =>
+        current.filter(
+          (category) =>
+            category.id !== targetCategoryId
+        )
+    )
+
+    setTasks(
+      (current) =>
+        current.map(
+          (task) =>
+            task.categoryId === targetCategoryId
+              ? {
+                  ...task,
+                  categoryId: null,
+                }
+              : task
+        )
+    )
+  }
+
+
+  /* ========================================
+
   Google Calendar
 
   認証トークンと取得済み予定を
@@ -2609,6 +2747,82 @@ const moveTaskOnTimeline = (
     useState<GoogleCalendarEvent[]>(
       []
     )
+
+
+  /* ========================================
+
+  Google Calendarを自動再接続
+
+  保存済みRefresh Tokenがある場合は、
+  アプリ起動時に新しいAccess Tokenを取得し、
+  予定も自動で読み込む
+
+  ======================================== */
+
+  useEffect(() => {
+    let isCancelled = false
+
+    const restoreGoogleCalendar = async () => {
+      try {
+        const token =
+          await refreshGoogleCalendarAccessToken()
+
+        if (
+          isCancelled ||
+          !token
+        ) {
+          return
+        }
+
+        const startDate =
+          new Date()
+
+        startDate.setHours(
+          0,
+          0,
+          0,
+          0
+        )
+
+        const endDate =
+          new Date(startDate)
+
+        endDate.setDate(
+          endDate.getDate() + 31
+        )
+
+        const events =
+          await fetchGoogleCalendarEvents(
+            token,
+            startDate,
+            endDate
+          )
+
+        if (isCancelled) {
+          return
+        }
+
+        setGoogleCalendarAccessToken(
+          token
+        )
+
+        setGoogleCalendarEvents(
+          events
+        )
+      } catch (error) {
+        console.error(
+          'Google Calendarの自動再接続に失敗しました',
+          error
+        )
+      }
+    }
+
+    void restoreGoogleCalendar()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [])
 
 
   /* ========================================
@@ -2697,12 +2911,27 @@ const moveTaskOnTimeline = (
         )
 
       case 'calendar':
-        return <CalendarPage />
+        return (
+          <CalendarPage
+            currentDate={now}
+            tasks={tasks}
+            onDateSelect={(date) => {
+              setSelectedDate(
+                date
+              )
+
+              setCurrentPage(
+                'today'
+              )
+            }}
+          />
+        )
 
       case 'tasks':
         return (
           <TasksPage
   tasks={tasks}
+  categories={categories}
   now={now}
   onAddTask={
     openNewTaskModalForToday
@@ -2761,7 +2990,13 @@ const moveTaskOnTimeline = (
         )
 
       case 'settings':
-        return <SettingsPage />
+        return (
+          <SettingsPage
+            categories={categories}
+            onAddCategory={addCategory}
+            onDeleteCategory={removeCategory}
+          />
+        )
 
       default:
         return null
@@ -2788,7 +3023,12 @@ const moveTaskOnTimeline = (
           editingTaskId
         }
         title={title}
+        categoryId={categoryId}
+        categories={categories}
         taskDate={taskDate}
+        taskDateFallback={
+          taskDateFallback
+        }
         durationMinutes={
           durationMinutes
         }
@@ -2799,6 +3039,7 @@ const moveTaskOnTimeline = (
         endTime={endTime}
         memo={memo}
         setTitle={setTitle}
+        setCategoryId={setCategoryId}
         setTaskDate={setTaskDate}
         setPriority={setPriority}
         setHasDeadline={

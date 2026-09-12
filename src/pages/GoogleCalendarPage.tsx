@@ -11,8 +11,11 @@ import {
 } from 'react'
 
 import {
+  disconnectStoredGoogleCalendar,
+  exchangeGoogleCalendarAuthorizationCode,
   fetchGoogleCalendarEvents,
-  requestGoogleCalendarAccessToken,
+  refreshGoogleCalendarAccessToken,
+  requestGoogleCalendarAuthorizationCode,
   revokeGoogleCalendarAccess,
 } from '../services/googleCalendar'
 
@@ -170,8 +173,13 @@ function GoogleCalendarPage({
     setErrorMessage('')
 
     try {
+      const code =
+        await requestGoogleCalendarAuthorizationCode()
+
       const token =
-        await requestGoogleCalendarAccessToken()
+        await exchangeGoogleCalendarAuthorizationCode(
+          code
+        )
 
       onAccessTokenChange(token)
 
@@ -194,16 +202,68 @@ function GoogleCalendarPage({
 
   ======================================== */
 
-  const disconnectGoogleCalendar = () => {
-    if (accessToken) {
-      revokeGoogleCalendarAccess(
-        accessToken
-      )
-    }
-
-    onAccessTokenChange(null)
-    onEventsChange([])
+  const disconnectGoogleCalendar = async () => {
+    setIsLoading(true)
     setErrorMessage('')
+
+    try {
+      await disconnectStoredGoogleCalendar()
+
+      if (accessToken) {
+        revokeGoogleCalendarAccess(
+          accessToken
+        )
+      }
+
+      onAccessTokenChange(null)
+      onEventsChange([])
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Google Calendarの接続解除に失敗しました。'
+      )
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+
+  /* ========================================
+
+  最新のAccess Tokenへ更新して予定取得
+
+  ======================================== */
+
+  const refreshAndLoadEvents = async () => {
+    setIsLoading(true)
+    setErrorMessage('')
+
+    try {
+      const token =
+        await refreshGoogleCalendarAccessToken()
+
+      if (!token) {
+        onAccessTokenChange(null)
+        onEventsChange([])
+
+        throw new Error(
+          'Google Calendarが未接続です。もう一度接続してください。'
+        )
+      }
+
+      onAccessTokenChange(token)
+
+      await loadEvents(token)
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Google Calendarの予定を更新できませんでした。'
+      )
+
+      setIsLoading(false)
+    }
   }
 
 
@@ -245,11 +305,9 @@ function GoogleCalendarPage({
               <button
                 type="button"
                 className="secondary-action-button"
-                onClick={() =>
-                  loadEvents(
-                    accessToken
-                  )
-                }
+                onClick={() => {
+                  void refreshAndLoadEvents()
+                }}
                 disabled={isLoading}
               >
                 {isLoading
@@ -260,9 +318,9 @@ function GoogleCalendarPage({
               <button
                 type="button"
                 className="secondary-action-button"
-                onClick={
-                  disconnectGoogleCalendar
-                }
+                onClick={() => {
+                  void disconnectGoogleCalendar()
+                }}
               >
                 接続を解除
               </button>
@@ -294,7 +352,7 @@ function GoogleCalendarPage({
 
         <div>
           <span className="google-calendar-status-label">
-            読み取り範囲
+            予定取得範囲
           </span>
 
           <strong>

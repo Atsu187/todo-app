@@ -57,6 +57,15 @@ export const mockTasks:
       taskDate:
         today,
 
+      categoryId:
+        null,
+
+      googleEventId:
+        null,
+
+      googleCalendarId:
+        null,
+
       startHour:
         10,
 
@@ -103,6 +112,15 @@ export const mockTasks:
 
       taskDate:
         today,
+
+      categoryId:
+        null,
+
+      googleEventId:
+        null,
+
+      googleCalendarId:
+        null,
 
       startHour:
         11,
@@ -151,6 +169,15 @@ export const mockTasks:
       taskDate:
         today,
 
+      categoryId:
+        null,
+
+      googleEventId:
+        null,
+
+      googleCalendarId:
+        null,
+
       startHour:
         13,
 
@@ -197,6 +224,15 @@ export const mockTasks:
 
       taskDate:
         today,
+
+      categoryId:
+        null,
+
+      googleEventId:
+        null,
+
+      googleCalendarId:
+        null,
 
       startHour:
         null,
