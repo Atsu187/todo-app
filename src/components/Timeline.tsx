@@ -89,7 +89,8 @@ type Props = {
   onMoveTask:
     (
       taskId: TaskId,
-      startMinutes: number
+      startMinutes: number,
+      targetDate: string
     ) => void
 
   onUnscheduleTask:
@@ -917,7 +918,8 @@ function Timeline({
 
       onMoveTask(
         current.taskId,
-        current.snappedStartMinutes
+        current.snappedStartMinutes,
+        date
       )
 
       window.setTimeout(
@@ -993,10 +995,7 @@ function Timeline({
           item.id === taskId
       )
 
-    if (
-      !task ||
-      task.taskDate !== date
-    ) {
+    if (!task) {
       return
     }
 
@@ -1102,20 +1101,71 @@ function Timeline({
   ) => {
     event.preventDefault()
 
-    const preview =
-      todoDropPreview
+    const transferredTaskId =
+      event.dataTransfer.getData(
+        'application/x-todo-task-id'
+      ) ||
+      event.dataTransfer.getData(
+        'text/plain'
+      )
+
+    const activeTaskId =
+      getActiveTodoTaskId()
+
+    const task =
+      tasks.find(
+        (item) =>
+          String(item.id) ===
+            transferredTaskId ||
+          (
+            activeTaskId !== null &&
+            item.id === activeTaskId
+          )
+      )
+
+    const timeline =
+      timelineBodyRef.current
 
     setTodoDropPreview(
       null
     )
 
-    if (!preview) {
+    if (
+      !task ||
+      !timeline
+    ) {
       return
     }
 
+    const rect =
+      timeline.getBoundingClientRect()
+
+    const contentY =
+      event.clientY -
+      rect.top +
+      timeline.scrollTop
+
+    const rawMinutes =
+      startHourOfTimeline *
+        60 +
+      contentY /
+        minuteHeight
+
+    const snapped =
+      snapStartMinutes(
+        rawMinutes
+      )
+
+    const startMinutes =
+      clampStartMinutes(
+        snapped,
+        task.durationMinutes
+      )
+
     onMoveTask(
-      preview.taskId,
-      preview.startMinutes
+      task.id,
+      startMinutes,
+      date
     )
   }
 

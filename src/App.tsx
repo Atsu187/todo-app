@@ -2232,7 +2232,8 @@ function TodoApp() {
 
 const moveTaskOnTimeline = (
   taskId: TaskId,
-  startMinutes: number
+  startMinutes: number,
+  targetDate: string = selectedDate
 ) => {
   setTasks(
     (current) =>
@@ -2250,6 +2251,9 @@ const moveTaskOnTimeline = (
 
           return {
             ...task,
+
+            taskDate:
+              targetDate,
 
             startHour:
               Math.floor(
