@@ -11,7 +11,6 @@
 ・日別ルーティン時間
 ・ルーティン結果
 ・生活記録
-・明日の予定調整
 ・タスク追加 / 編集 / 削除
 ・未完了タスクの翌日繰越
 
@@ -30,7 +29,6 @@ import './App.css'
 import LoginPage from './components/LoginPage'
 import Sidebar from './components/Sidebar'
 import TaskModal from './components/TaskModal'
-import TomorrowRoutineModal from './components/TomorrowRoutineModal'
 
 import TodayPage from './pages/TodayPage'
 import CalendarPage from './pages/CalendarPage'
@@ -137,7 +135,6 @@ import {
 
 import {
   getLocalDateKey,
-  getTomorrowDateKey,
   isDateBefore,
 } from './utils/date'
 
@@ -235,10 +232,6 @@ function TodoApp() {
 
   const todayDate =
     getLocalDateKey(now)
-
-  const tomorrowDate =
-    getTomorrowDateKey(now)
-
 
   /* ========================================
 
@@ -1569,14 +1562,6 @@ function TodoApp() {
     useState<TaskId | null>(null)
 
 
-  /* ========================================
-
-  明日の予定調整モーダル
-
-  ======================================== */
-
-  const [isTomorrowModalOpen, setIsTomorrowModalOpen] =
-    useState(false)
 
 
   /* ========================================
@@ -2440,89 +2425,8 @@ const moveTaskOnTimeline = (
   }
 
 
-  /* ========================================
-
-  タスクを明日へ移動
-
-  時刻は一旦解除して
-  明日のToDoへ入れる
-
-  ======================================== */
-
-  const moveTaskToTomorrow = (
-    taskId: TaskId
-  ) => {
-    setTasks(
-      (current) =>
-        current.map(
-          (task) =>
-            task.id === taskId
-              ? {
-                  ...task,
-                  taskDate:
-                    tomorrowDate,
-                  startHour: null,
-                  startMinute: null,
-                  endHour: null,
-                  endMinute: null,
-                }
-              : task
-        )
-    )
-  }
 
 
-  /* ========================================
-
-  日別ルーティン時刻を保存
-
-  基本時刻と同じものは
-  overrideとして保存しない
-
-  ======================================== */
-
-  const saveRoutineTimesForDate = (
-    date: string,
-    times:
-      Record<number, string | null>
-  ) => {
-    setRoutineOverrides(
-      (current) => {
-        const withoutDate =
-          current.filter(
-            (override) =>
-              override.date !== date
-          )
-
-        const additions:
-          RoutineTimeOverride[] = []
-
-        routines.forEach(
-          (routine) => {
-            const selected =
-              times[routine.id] ?? null
-
-            if (
-              selected !==
-              routine.defaultTime
-            ) {
-              additions.push({
-                routineId: routine.id,
-                date,
-                scheduledTime:
-                  selected,
-              })
-            }
-          }
-        )
-
-        return [
-          ...withoutDate,
-          ...additions,
-        ]
-      }
-    )
-  }
 
 
   /* ========================================
@@ -2906,11 +2810,6 @@ const moveTaskOnTimeline = (
                   { reflection: value }
                 )
             }
-            onOpenTomorrowAdjust={() =>
-              setIsTomorrowModalOpen(
-                true
-              )
-            }
           />
         )
 
@@ -2966,11 +2865,6 @@ const moveTaskOnTimeline = (
             routines={routines}
             onRoutinesChange={
               setRoutines
-            }
-            onOpenTomorrowAdjust={() =>
-              setIsTomorrowModalOpen(
-                true
-              )
             }
           />
         )
@@ -3065,27 +2959,6 @@ const moveTaskOnTimeline = (
         onDelete={deleteTask}
       />
 
-      <TomorrowRoutineModal
-        isOpen={
-          isTomorrowModalOpen
-        }
-        date={tomorrowDate}
-        todayDate={todayDate}
-        routines={routines}
-        overrides={routineOverrides}
-        tasks={tasks}
-        onClose={() =>
-          setIsTomorrowModalOpen(
-            false
-          )
-        }
-        onSaveTimes={
-          saveRoutineTimesForDate
-        }
-        onMoveTaskToTomorrow={
-          moveTaskToTomorrow
-        }
-      />
     </div>
   )
 }

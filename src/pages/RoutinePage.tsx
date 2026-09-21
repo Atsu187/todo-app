@@ -8,7 +8,6 @@
 ・追加 / 編集 / 削除
 ・並び替え
 ・基本時刻の自動配置
-・明日の予定調整
 
 ======================================== */
 
@@ -35,16 +34,12 @@ type Props = {
 
   onRoutinesChange:
     (routines: RoutineItem[]) => void
-
-  onOpenTomorrowAdjust:
-    () => void
 }
 
 
 function RoutinePage({
   routines,
   onRoutinesChange,
-  onOpenTomorrowAdjust,
 }: Props) {
   const [isModalOpen, setIsModalOpen] =
     useState(false)
@@ -412,13 +407,6 @@ function RoutinePage({
           </p>
         </div>
 
-        <button
-          type="button"
-          className="routine-add-button"
-          onClick={onOpenTomorrowAdjust}
-        >
-          明日の予定を調整
-        </button>
       </header>
 
       <RoutineList

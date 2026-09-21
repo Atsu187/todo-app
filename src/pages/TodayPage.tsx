@@ -113,8 +113,6 @@ type Props = {
   onReflectionChange:
     (value: string) => void
 
-  onOpenTomorrowAdjust:
-    () => void
 }
 
 
@@ -139,7 +137,6 @@ function TodayPage({
   onToggleRoutineSkip,
   onWakeUpTimeChange,
   onReflectionChange,
-  onOpenTomorrowAdjust,
 }: Props) {
 
   const todayDate =
@@ -424,16 +421,6 @@ function TodayPage({
                   起床
                 </button>
               )}
-
-              <button
-                type="button"
-                className="secondary-action-button header-square-action"
-                onClick={
-                  onOpenTomorrowAdjust
-                }
-              >
-                明日の予定を調整
-              </button>
 
               <button
                 type="button"
