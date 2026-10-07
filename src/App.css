@@ -2315,7 +2315,7 @@ ToDo1件
 .routine-page {
   width: 100%;
 
-  max-width: 900px;
+  max-width: 799px;
 
   margin: 0 auto;
 
@@ -3516,7 +3516,7 @@ Google Calendarページ
   text-decoration: underline;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 799px) {
   .google-calendar-page {
     height: auto;
     min-height: 100vh;
@@ -3565,7 +3565,7 @@ Google Calendarページ
 ======================================== */
 
 @media (
-  max-width: 900px
+  max-width: 799px
 ) {
 
   .app {
@@ -3800,7 +3800,7 @@ Google Calendarページ
 ======================================== */
 
 .tomorrow-routine-modal {
-  max-width: 900px;
+  max-width: 799px;
   max-height: calc(100vh - 40px);
   overflow-y: auto;
 }
@@ -4347,7 +4347,7 @@ ToDoリスト
 
 ======================================== */
 
-@media (max-width: 900px) {
+@media (max-width: 799px) {
   .today-header-actions {
     width: 100%;
   }
@@ -4645,7 +4645,7 @@ Today画面全体を上下移動できるようにする
 
 ======================================== */
 
-@media (max-width: 900px) {
+@media (max-width: 799px) {
 
   html,
   body,
@@ -4764,7 +4764,7 @@ PCでは非表示
 
 ======================================== */
 
-@media (max-width: 900px) {
+@media (max-width: 799px) {
 
   html,
   body,
@@ -5116,7 +5116,7 @@ Today上部ヘッダー修正
 
 ======================================== */
 
-@media (max-width: 900px) {
+@media (max-width: 799px) {
 
   .timeline-header {
     width: 100%;
@@ -5989,7 +5989,7 @@ Todayヘッダー
     minmax(300px, 360px);
 }
 
-@media (max-width: 1180px) and (min-width: 901px) {
+@media (max-width: 1180px) and (min-width: 800px) {
   .today-top {
     grid-template-columns:
       minmax(0, 1fr)
@@ -6010,7 +6010,7 @@ Todayヘッダー
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 799px) {
   .today-header-actions {
     display: flex;
     width: 100%;
@@ -6059,7 +6059,7 @@ Todayヘッダー
 
 ======================================== */
 
-@media (max-width: 900px) {
+@media (max-width: 799px) {
 
   .timeline-header {
     height: auto;
@@ -6168,4 +6168,72 @@ Todayヘッダー
       auto;
   }
 
+}
+
+
+/* ========================================
+
+コンパクトPC
+24インチ半画面（約960px）を基準
+既存レイアウトは維持し、時間列だけ非表示
+
+======================================== */
+
+@media (min-width: 800px) and (max-width: 1199px) {
+  .todo-table-header,
+  .todo-item {
+    grid-template-columns:
+      minmax(120px, 1fr)
+      55px
+      55px;
+  }
+
+  .todo-time-column {
+    display: none;
+  }
+}
+
+
+/* ========================================
+
+未完了ToDo
+カテゴリ絞り込み
+
+======================================== */
+
+.todo-category-filter {
+  width: 100%;
+  max-width: 190px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid #d9dde5;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #333333;
+  font: inherit;
+  font-size: 13px;
+}
+
+@media (max-width: 799px) {
+  .todo-header {
+    gap: 10px;
+  }
+
+  .todo-category-filter {
+    max-width: none;
+  }
+}
+
+/* ========================================
+
+Todayヘッダー
+文字の折り返し防止
+
+======================================== */
+
+.date-navigation h1,
+.today-return-button,
+.today-header-actions .header-square-action,
+.today-header-actions .add-button {
+  white-space: nowrap;
 }

@@ -2745,6 +2745,7 @@ const moveTaskOnTimeline = (
         return (
           <TodayPage
             tasks={tasks}
+            categories={categories}
             now={now}
             selectedDate={selectedDate}
             onDateChange={setSelectedDate}

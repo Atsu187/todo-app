@@ -34,6 +34,10 @@ import type {
   GoogleCalendarEvent,
 } from '../services/googleCalendar'
 
+import type {
+  TaskCategory,
+} from '../types/category'
+
 import Timeline from '../components/Timeline'
 import TodoPanel from '../components/TodoPanel'
 import TodayRoutine from '../components/TodayRoutine'
@@ -53,6 +57,8 @@ import {
 
 type Props = {
   tasks: Task[]
+
+  categories: TaskCategory[]
 
   now: Date
 
@@ -118,6 +124,7 @@ type Props = {
 
 function TodayPage({
   tasks,
+  categories,
   now,
   selectedDate,
   onDateChange,
@@ -490,6 +497,7 @@ function TodayPage({
         <TodoPanel
           date={viewedDate}
           tasks={tasks}
+          categories={categories}
           routines={routines}
           routineOverrides={
             routineOverrides

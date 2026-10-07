@@ -296,7 +296,15 @@ function Timeline({
     minutesFromStart *
     minuteHeight
 
+  const todayDateKey =
+    `${now.getFullYear()}-${String(
+      now.getMonth() + 1
+    ).padStart(2, '0')}-${String(
+      now.getDate()
+    ).padStart(2, '0')}`
+
   const showCurrentTime =
+    date === todayDateKey &&
     minutesFromStart >= 0 &&
     minutesFromStart <=
       (

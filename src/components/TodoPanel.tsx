@@ -23,6 +23,10 @@ import type {
 } from '../types/task'
 
 import type {
+  TaskCategory,
+} from '../types/category'
+
+import type {
   RoutineDayState,
   RoutineItem,
   RoutineTimeOverride,
@@ -46,6 +50,8 @@ type Props = {
   date: string
 
   tasks: Task[]
+
+  categories: TaskCategory[]
 
   routines: RoutineItem[]
 
@@ -72,6 +78,7 @@ type Props = {
 function TodoPanel({
   date,
   tasks,
+  categories,
   routines,
   routineOverrides,
   routineStates,
@@ -98,6 +105,18 @@ function TodoPanel({
 
   /* ========================================
 
+  カテゴリ絞り込み
+
+  ======================================== */
+
+  const [
+    selectedCategoryId,
+    setSelectedCategoryId,
+  ] = useState<string>('all')
+
+
+  /* ========================================
+
   時間未設定の通常タスク
 
   ======================================== */
@@ -109,6 +128,15 @@ function TodoPanel({
         (
           task.startHour === null ||
           task.startMinute === null
+        ) &&
+        (
+          selectedCategoryId === 'all' ||
+          (
+            selectedCategoryId === 'none'
+              ? task.categoryId === null
+              : task.categoryId ===
+                selectedCategoryId
+          )
         )
     )
 
@@ -122,6 +150,13 @@ function TodoPanel({
   const unscheduledRoutines =
     routines.filter(
       (routine) => {
+        if (
+          selectedCategoryId !== 'all' &&
+          selectedCategoryId !== 'none'
+        ) {
+          return false
+        }
+
         const state =
           routineStates.find(
             (item) =>
@@ -215,6 +250,36 @@ function TodoPanel({
 
         </div>
 
+        <select
+          className="todo-category-filter"
+          value={selectedCategoryId}
+          onChange={(event) =>
+            setSelectedCategoryId(
+              event.target.value
+            )
+          }
+          aria-label="カテゴリで絞り込み"
+        >
+          <option value="all">
+            すべてのカテゴリ
+          </option>
+
+          {categories.map(
+            (category) => (
+              <option
+                key={category.id}
+                value={category.id}
+              >
+                {category.name}
+              </option>
+            )
+          )}
+
+          <option value="none">
+            カテゴリなし
+          </option>
+        </select>
+
       </div>
 
 
@@ -224,7 +289,7 @@ function TodoPanel({
           タスク
         </span>
 
-        <span>
+        <span className="todo-time-column">
           時間
         </span>
 
@@ -318,7 +383,7 @@ function TodoPanel({
 
               </span>
 
-              <span>
+              <span className="todo-time-column">
                 {task.durationMinutes}
                 分
               </span>
@@ -416,7 +481,7 @@ function TodoPanel({
 
               </span>
 
-              <span>
+              <span className="todo-time-column">
                 {routine.durationMinutes}
                 分
               </span>
