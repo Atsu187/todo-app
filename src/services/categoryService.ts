@@ -26,7 +26,7 @@ export const fetchCategories = async (): Promise<TaskCategory[]> => {
 
   const { data, error } = await supabase
     .from('categories')
-    .select('id, name')
+    .select('id, name, color')
     .eq('user_id', userId)
     .order('created_at', { ascending: true })
 
@@ -38,7 +38,8 @@ export const fetchCategories = async (): Promise<TaskCategory[]> => {
 }
 
 export const createCategory = async (
-  name: string
+  name: string,
+  color: string = '#64748b'
 ): Promise<TaskCategory> => {
   const userId = await getCurrentUserId()
 
@@ -47,8 +48,9 @@ export const createCategory = async (
     .insert({
       user_id: userId,
       name: name.trim(),
+      color,
     })
-    .select('id, name')
+    .select('id, name, color')
     .single()
 
   if (error) {
@@ -72,4 +74,27 @@ export const deleteCategory = async (
   if (error) {
     throw error
   }
+}
+
+/* ========================================
+
+カテゴリ名・色の更新
+
+======================================== */
+
+export const updateCategory = async (
+  categoryId: string,
+  name: string,
+  color: string
+): Promise<TaskCategory> => {
+  const userId = await getCurrentUserId()
+  const { data, error } = await supabase
+    .from('categories')
+    .update({ name: name.trim(), color })
+    .eq('id', categoryId)
+    .eq('user_id', userId)
+    .select('id, name, color')
+    .single()
+  if (error) throw error
+  return data as TaskCategory
 }

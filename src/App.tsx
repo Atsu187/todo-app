@@ -49,6 +49,7 @@ import SettingsPage from './pages/SettingsPage'
 import {
   createCategory,
   deleteCategory,
+  updateCategory,
   fetchCategories,
 } from './services/categoryService'
 
@@ -1577,7 +1578,7 @@ function TodoApp() {
     useState('')
 
   const [taskDate, setTaskDate] =
-    useState(selectedDate)
+    useState('')
 
   const [
     taskDateFallback,
@@ -1592,7 +1593,7 @@ function TodoApp() {
     useState<Priority>('中')
 
   const [hasDeadline, setHasDeadline] =
-    useState(true)
+    useState(false)
 
   const [dueDate, setDueDate] =
     useState('')
@@ -1726,13 +1727,13 @@ function TodoApp() {
   const resetForm = () => {
     setTitle('')
     setCategoryId('')
-    setTaskDate(selectedDate)
+    setTaskDate('')
     setTaskDateFallback(
       selectedDate
     )
     setDurationMinutes(60)
     setPriority('中')
-    setHasDeadline(true)
+    setHasDeadline(false)
     setDueDate('')
     setStartTime('')
     setEndTime('')
@@ -1758,7 +1759,7 @@ function TodoApp() {
 
   const openNewTaskModal = () => {
     resetForm()
-    setTaskDate(selectedDate)
+    setTaskDate('')
     setTaskDateFallback(
       selectedDate
     )
@@ -1777,7 +1778,7 @@ function TodoApp() {
 
   const openNewTaskModalForToday = () => {
     resetForm()
-    setTaskDate(todayDate)
+    setTaskDate('')
     setTaskDateFallback(
       todayDate
     )
@@ -2587,10 +2588,11 @@ const moveTaskOnTimeline = (
   ======================================== */
 
   const addCategory = async (
-    name: string
+    name: string,
+    color: string
   ) => {
     const saved =
-      await createCategory(name)
+      await createCategory(name, color)
 
     setCategories(
       (current) => [
@@ -2600,6 +2602,11 @@ const moveTaskOnTimeline = (
     )
   }
 
+
+  const editCategory = async (id: string, name: string, color: string) => {
+    const updated = await updateCategory(id, name, color)
+    setCategories((current) => current.map((category) => category.id === id ? updated : category))
+  }
 
   const removeCategory = async (
     targetCategoryId: string
@@ -2893,6 +2900,7 @@ const moveTaskOnTimeline = (
           <SettingsPage
             categories={categories}
             onAddCategory={addCategory}
+            onUpdateCategory={editCategory}
             onDeleteCategory={removeCategory}
           />
         )

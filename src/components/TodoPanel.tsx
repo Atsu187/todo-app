@@ -335,6 +335,13 @@ function TodoPanel({
                 .join(' ')
               }
               key={task.id}
+              style={(() => {
+                const color = categories.find((category) => category.id === task.categoryId)?.color
+                return color ? {
+                  borderLeft: `4px solid ${color}`,
+                  backgroundColor: `color-mix(in srgb, ${color} 12%, white)`,
+                } : { borderLeft: '4px solid #e5e7eb' }
+              })()}
               draggable
               onDragStart={(
                 event

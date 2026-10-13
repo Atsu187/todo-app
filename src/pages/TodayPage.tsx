@@ -450,6 +450,7 @@ function TodayPage({
 
           <Timeline
             tasks={tasks}
+            categories={categories}
             now={now}
             date={viewedDate}
             routines={routines}

@@ -19,7 +19,10 @@ type Props = {
   categories: TaskCategory[]
 
   onAddCategory:
-    (name: string) => Promise<void>
+    (name: string, color: string) => Promise<void>
+
+  onUpdateCategory:
+    (id: string, name: string, color: string) => Promise<void>
 
   onDeleteCategory:
     (categoryId: string) => Promise<void>
@@ -29,11 +32,15 @@ type Props = {
 function SettingsPage({
   categories,
   onAddCategory,
+  onUpdateCategory,
   onDeleteCategory,
 }: Props) {
 
   const [categoryName, setCategoryName] =
     useState('')
+
+  const [newColor, setNewColor] = useState('#64748b')
+  const [drafts, setDrafts] = useState<Record<string, {name: string; color: string}>>({})
 
   const [message, setMessage] =
     useState('')
@@ -48,7 +55,7 @@ function SettingsPage({
     }
 
     try {
-      await onAddCategory(name)
+      await onAddCategory(name, newColor)
       setCategoryName('')
       setMessage(
         'カテゴリを追加しました。'
@@ -112,6 +119,7 @@ function SettingsPage({
             placeholder="例：研究"
           />
 
+          <input type="color" aria-label="新しいカテゴリの色" value={newColor} onChange={(event) => setNewColor(event.target.value)} />
           <button
             type="button"
             className="primary-action-button"
@@ -130,10 +138,18 @@ function SettingsPage({
                 className="category-settings-row"
                 key={category.id}
               >
-                <span>
-                  {category.name}
-                </span>
-
+                <input type="color" aria-label={`${category.name}の色`} value={drafts[category.id]?.color ?? category.color ?? '#64748b'} onChange={(event) => setDrafts((current) => ({...current, [category.id]: {name: current[category.id]?.name ?? category.name, color: event.target.value}}))} />
+                <input type="text" aria-label="カテゴリ名" value={drafts[category.id]?.name ?? category.name} onChange={(event) => setDrafts((current) => ({...current, [category.id]: {name: event.target.value, color: current[category.id]?.color ?? category.color ?? '#64748b'}}))} />
+                <button type="button" className="secondary-action-button" onClick={async () => {
+                  const draft = drafts[category.id]
+                  if (!draft) return
+                  if (!draft.name.trim()) { setMessage('カテゴリ名を入力してください。'); return }
+                  try {
+                    await onUpdateCategory(category.id, draft.name, draft.color)
+                    setDrafts((current) => { const next = {...current}; delete next[category.id]; return next })
+                    setMessage('カテゴリを更新しました。')
+                  } catch (error) { setMessage(error instanceof Error ? error.message : '更新に失敗しました。') }
+                }}>保存</button>
                 <button
                   type="button"
                   className="secondary-action-button"

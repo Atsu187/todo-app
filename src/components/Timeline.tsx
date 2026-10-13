@@ -44,6 +44,8 @@ import type {
   GoogleCalendarEvent,
 } from '../services/googleCalendar'
 
+import type { TaskCategory } from '../types/category'
+
 import TaskBlock from './TaskBlock'
 
 import {
@@ -64,6 +66,7 @@ import './Timeline.css'
 
 type Props = {
   tasks: Task[]
+  categories: TaskCategory[]
 
   now: Date
 
@@ -153,6 +156,7 @@ type TodoDropPreview = {
 
 function Timeline({
   tasks,
+  categories,
   now,
   date,
   routines,
@@ -1609,6 +1613,7 @@ function Timeline({
             <TaskBlock
               key={task.id}
               task={task}
+              categoryColor={categories.find((category) => category.id === task.categoryId)?.color ?? null}
               top={
                 getTaskTop(
                   task.startHour,

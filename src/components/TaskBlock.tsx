@@ -26,6 +26,7 @@ import type {
 
 type Props = {
   task: Task
+  categoryColor: string | null
 
   top: number
 
@@ -69,6 +70,7 @@ function formatTime(
 
 function TaskBlock({
   task,
+  categoryColor,
   top,
   height,
   columnIndex,
@@ -244,7 +246,13 @@ function TaskBlock({
         .filter(Boolean)
         .join(' ')
       }
-      style={taskStyle}
+      style={{
+        ...taskStyle,
+        ...(categoryColor ? {
+          borderLeft: `4px solid ${categoryColor}`,
+          backgroundColor: `color-mix(in srgb, ${categoryColor} 22%, white)`,
+        } : {}),
+      }}
       onClick={() =>
         onEdit(task)
       }
